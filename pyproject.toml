@@ -1,0 +1,17 @@
+[build-system]
+# Minimal PEP-517 section so packaging tools can build a wheel if needed
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bootcamp-webchat"
+version = "0.1.0"
+description = "Simple multi-user, single-room real-time chat built with aiohttp."
+requires-python = ">=3.13"
+
+# Runtime dependencies
+dependencies = ["aiohttp>=3.9", "redis>=5.0"]
+
+[project.optional-dependencies]
+# Development / QA tools (not installed in production)
+dev = ["pytest>=8.0", "mypy", "ruff"]

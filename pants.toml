@@ -1,0 +1,14 @@
+[GLOBAL]
+pants_version = "2.28.0"
+backend_packages = ["pants.backend.python"]
+pythonpath = []
+
+[source]
+root_patterns = ["src", "frontend"]
+
+[python]
+interpreter_constraints = ["CPython==3.13.*"]
+enable_resolves = true
+
+[pytest]
+# (we’ll add tests later)
