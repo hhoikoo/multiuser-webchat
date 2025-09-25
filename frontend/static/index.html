@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="/static/css/output.css" rel="stylesheet">
+    <title>Bootcamp Webchat</title>
+</head>
+
+<body class="bg-gray-100 flex flex-col h-screen">
+    <main id="messages" class="flex-1 overflow-y-auto p-4"></main>
+    <form id="chat-form" class="flex p-4">
+        <input id="msg" class="flex-1 border rounded p-2 mr-2" placeholder="Type a message" />
+        <button class="bg-blue-600 text-white px-4 py-2 rounded">Send</button>
+    </form>
+    <script type="module" src="/static/app.js"></script>
+</body>
+
+</html>

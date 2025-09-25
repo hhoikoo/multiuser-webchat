@@ -1,20 +1,28 @@
+from pathlib import Path
+
 from aiohttp import web
-from aiohttp.web_request import Request
-from aiohttp.web_response import Response
 
 
-async def healthz(_: Request) -> Response:
+STATIC_RESOURCES_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+async def healthz(_: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
-async def index(_: Request) -> Response:
-    return web.Response(text="bootcamp-webchat up", content_type="text/plain")
+async def index(_: web.Request) -> web.FileResponse:
+    return web.FileResponse(STATIC_RESOURCES_DIR / "index.html")
 
 
 def create_app() -> web.Application:
     app = web.Application()
-    app.router.add_get("/", index)
-    app.router.add_get("/healthz", healthz)
+    app.add_routes(
+        [
+            web.get("/", index),
+            web.get("/healthz", healthz),
+            web.static("/static", STATIC_RESOURCES_DIR),
+        ]
+    )
     return app
 
 
