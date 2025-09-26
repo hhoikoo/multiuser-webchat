@@ -2,6 +2,8 @@ from pathlib import Path
 
 from aiohttp import web
 
+from server.ws import install_ws_router
+
 
 STATIC_RESOURCES_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -23,6 +25,7 @@ def create_app() -> web.Application:
             web.static("/static", STATIC_RESOURCES_DIR),
         ]
     )
+    install_ws_router(app)
     return app
 
 

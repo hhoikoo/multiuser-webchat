@@ -1,16 +1,49 @@
 "use strict";
 
-const ws = new WebSocket(`ws://${location.host}/ws`);
+const messages = document.querySelector("#messages");
+const chatForm = document.querySelector("#chat-form");
+const messageInput = document.querySelector("#message-input");
+const sendButton = document.querySelector("#send-button");
 
-ws.onmessage = e => {
-    const div = document.createElement('div');
-    div.textContent = e.data;
-    document.getElementById('messages').appendChild(div);
+const appendMessage = (text) => {
+    const textDiv = document.createElement('div');
+    textDiv.className = 'py-1';
+    textDiv.textContent = text;
+    messages.appendChild(textDiv);
+    messages.scrollTop = messages.scrollHeight;
 };
 
-document.getElementById('chat-form').addEventListener('submit', e => {
+const ws = new WebSocket(`ws://${location.host}/ws`);
+ws.addEventListener('open', () => appendMessage('[connected]'));
+ws.addEventListener('close', () => appendMessage('[disconnected]'));
+ws.addEventListener('message', (e) => {
+    try {
+        const { text } = JSON.parse(e.data);
+        appendMessage(text);
+    } catch {
+        appendMessage(e.data);
+    }
+});
+
+const sendMessage = () => {
+    const text = messageInput.value.trim();
+    if (!text || ws.readyState !== WebSocket.OPEN) {
+        // TODO: Display failure message or alert?
+        return;
+    }
+
+    ws.send(JSON.stringify({ type: 'chat', text, ts: Date.now() }));
+
+    messageInput.value = '';
+    messageInput.focus();
+};
+
+sendButton.addEventListener('click', (e) => {
     e.preventDefault();
-    const input = document.getElementById('msg');
-    ws.send(input.value);
-    input.value = '';
+    sendMessage();
+});
+messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        sendMessage();
+    }
 });
