@@ -3,7 +3,6 @@
 const messages = document.querySelector("#messages");
 const chatForm = document.querySelector("#chat-form");
 const messageInput = document.querySelector("#message-input");
-const sendButton = document.querySelector("#send-button");
 
 const appendMessage = (text) => {
     const textDiv = document.createElement('div');
@@ -25,7 +24,9 @@ ws.addEventListener('message', (e) => {
     }
 });
 
-const sendMessage = () => {
+chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+
     const text = messageInput.value.trim();
     if (!text || ws.readyState !== WebSocket.OPEN) {
         // TODO: Display failure message or alert?
@@ -36,14 +37,4 @@ const sendMessage = () => {
 
     messageInput.value = '';
     messageInput.focus();
-};
-
-sendButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    sendMessage();
-});
-messageInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        sendMessage();
-    }
 });
