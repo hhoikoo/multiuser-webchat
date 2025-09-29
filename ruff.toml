@@ -1,0 +1,87 @@
+target-version = "py313"
+
+# Exclude generated files and external dependencies
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".pants.d",
+    ".venv",
+    "__pycache__",
+    "dist",
+    "build",
+    "*.egg-info",
+]
+
+# Line length to match common Python standards
+line-length = 88
+
+# Enable specific rule categories
+[lint]
+# Enable comprehensive rule sets
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "I",   # isort
+    "N",   # pep8-naming
+    "S",   # flake8-bandit (security)
+    "C4",  # flake8-comprehensions
+    "PTH", # flake8-use-pathlib
+    "RUF", # Ruff-specific rules
+    "PL",  # pylint
+    "A",   # flake8-builtins
+    "COM", # flake8-commas
+    "C90", # mccabe complexity
+]
+
+# Ignore specific rules that may be too strict for this codebase
+ignore = [
+    "E501",    # line-too-long (handled by formatter)
+    "S101",    # assert-used (common in tests and development)
+    "PLR0913", # too-many-arguments (can be pragmatic)
+    "PLR0915", # too-many-statements (can be pragmatic)
+    "COM812",  # trailing-comma-missing (formatter handles this)
+    "COM819",  # trailing-comma-prohibited (formatter handles this)
+]
+
+# Allow unfixable rules to be reported
+unfixable = [
+    "F401", # unused-import (better to fix manually)
+    "F841", # unused-variable (better to fix manually)
+]
+
+# Per-file ignores for specific patterns
+[lint.per-file-ignores]
+# Tests may use assert statements and have relaxed security
+"**/test_*.py" = ["S101", "S105", "S106", "S107"]
+"**/tests/**/*.py" = ["S101", "S105", "S106", "S107"]
+
+# Configuration may have hardcoded values
+"**/config*.py" = ["S105", "S106"]
+
+[lint.mccabe]
+# Maximum cyclomatic complexity
+max-complexity = 10
+
+[lint.pylint]
+# Reduce some overly strict pylint defaults
+max-args = 8
+max-branches = 15
+max-returns = 8
+max-statements = 60
+
+[format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Use spaces around operators
+indent-style = "space"
+
+# Respect existing line endings
+line-ending = "auto"
+
+# Format docstrings
+docstring-code-format = true

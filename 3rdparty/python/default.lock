@@ -10,10 +10,10 @@
 //   ],
 //   "generated_with_requirements": [
 //     "aiohttp>=3.9",
-//     "mypy",
-//     "pytest>=8.0",
+//     "mypy>=1.18",
+//     "pytest>=8.4",
 //     "redis>=5.0",
-//     "ruff"
+//     "ruff>=0.13"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -1268,10 +1268,10 @@
   "prefer_older_binary": false,
   "requirements": [
     "aiohttp>=3.9",
-    "mypy",
-    "pytest>=8.0",
+    "mypy>=1.18",
+    "pytest>=8.4",
     "redis>=5.0",
-    "ruff"
+    "ruff>=0.13"
   ],
   "requires_python": [
     "==3.13.*"

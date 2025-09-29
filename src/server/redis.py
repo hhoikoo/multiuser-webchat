@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import logging
-from typing import Awaitable, Callable
-
 import asyncio
+import contextlib
+import logging
+from collections.abc import Awaitable, Callable
+
 import redis.asyncio as redis
 from aiohttp import web
 
@@ -38,10 +39,8 @@ class RedisManager:
     async def disconnect(self) -> None:
         if self._listener_task and not self._listener_task.done():
             self._listener_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._listener_task
-            except asyncio.CancelledError:
-                pass
 
         if self.client:
             await self.client.aclose()

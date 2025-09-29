@@ -1,6 +1,11 @@
 [GLOBAL]
 pants_version = "2.28.0"
-backend_packages = ["pants.backend.python"]
+backend_packages = [
+    "pants.backend.python",
+    "pants.backend.python.typecheck.mypy",
+    "pants.backend.experimental.python.lint.ruff.check",
+    "pants.backend.experimental.python.lint.ruff.format",
+]
 pythonpath = []
 
 [source]
@@ -10,5 +15,11 @@ root_patterns = ["src", "frontend"]
 interpreter_constraints = ["CPython==3.13.*"]
 enable_resolves = true
 
+[ruff]
+config = "ruff.toml"
+
+[mypy]
+config = "mypy.ini"
+
 [pytest]
-# (we’ll add tests later)
+# (we'll add tests later)

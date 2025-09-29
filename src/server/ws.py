@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from enum import Enum, auto
-import logging
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-
-from aiohttp import web, WSMsgType, WSMessage, WSCloseCode
 import asyncio
+import logging
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from enum import Enum, auto
 
-from server.redis import ChatMessage, RedisManager
+from aiohttp import WSCloseCode, WSMessage, WSMsgType, web
+
+from server.models import ChatMessage
+from server.redis import RedisManager
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ class WSMessageRouter:
                 asyncio.gather(*closing_open_sockets, return_exceptions=True),
                 timeout=WS_CLOSE_TIMEOUT,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Best-effort socket shutdown. Process is terminating anyway.
             logger.warning("Timeout while closing WebSocket connections")
 
@@ -118,7 +119,7 @@ class WSMessageRouter:
             *(self._send_to_peer(peer, payload) for peer in clients_snapshot)
         )
 
-        for peer, result in zip(clients_snapshot, broadcast_results):
+        for peer, result in zip(clients_snapshot, broadcast_results, strict=True):
             if result != PeerStatus.OK:
                 self.clients.discard(peer)
 
@@ -143,7 +144,7 @@ class WSMessageRouter:
                     code=WSCloseCode.GOING_AWAY,
                     message=b"Send timeout",
                 )
-            )
+            ).add_done_callback(lambda _: _)
             return PeerStatus.TIMEOUT
         except Exception:
             # TODO: Hard-exit for unexpected error?
@@ -157,7 +158,7 @@ class WSMessageRouter:
                     code=WSCloseCode.INTERNAL_ERROR,
                     message=b"Unknown internal error",
                 )
-            )
+            ).add_done_callback(lambda _: _)
             return PeerStatus.INTERNAL_ERROR
 
         return PeerStatus.OK

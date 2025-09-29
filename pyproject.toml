@@ -14,4 +14,4 @@ dependencies = ["aiohttp>=3.9", "redis>=5.0"]
 
 [project.optional-dependencies]
 # Development / QA tools (not installed in production)
-dev = ["pytest>=8.0", "mypy", "ruff"]
+dev = ["pytest>=8.4", "mypy>=1.18", "ruff>=0.13"]

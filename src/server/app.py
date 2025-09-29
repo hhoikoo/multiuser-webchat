@@ -2,15 +2,15 @@ import argparse
 import logging
 import multiprocessing
 import os
-from pathlib import Path
 import signal
 import sys
+from pathlib import Path
 from types import FrameType
 
 from aiohttp import web
 
-from server.ws import WSMessageRouter, install_ws_router
 from server.redis import RedisManager, install_redis_manager
+from server.ws import WSMessageRouter, install_ws_router
 
 logger = logging.getLogger(__name__)
 
@@ -141,8 +141,8 @@ def parse_args() -> argparse.Namespace:
     def positive_integer(value: str) -> int:
         try:
             ivalue = int(value)
-        except ValueError:
-            raise argparse.ArgumentTypeError(f"{value} is not a valid integer")
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(f"{value} is not a valid integer") from exc
         if ivalue < 1:
             raise argparse.ArgumentTypeError(f"{value} must be at least 1")
         return ivalue

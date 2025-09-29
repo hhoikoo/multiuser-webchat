@@ -2,7 +2,6 @@ import json
 import logging
 from dataclasses import asdict, dataclass
 
-
 logger = logging.getLogger(__name__)
 
 
