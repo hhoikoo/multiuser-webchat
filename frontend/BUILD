@@ -3,6 +3,6 @@ resources(
     sources=[
         "static/index.html",
         "static/app.js",
-        "static/css/output.css",
+        "static/style.css",
     ],
 )

@@ -4,16 +4,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="/static/css/output.css" rel="stylesheet">
+    <link href="/static/style.css" rel="stylesheet">
     <title>Bootcamp Webchat</title>
 </head>
 
-<body class="bg-gray-100 flex flex-col h-screen">
-    <main id="messages" class="flex-1 overflow-y-auto p-4"></main>
-    <form id="chat-form" class="flex p-4">
-        <input id="message-input" class="flex-1 border rounded p-2 mr-2" placeholder="Type a message" />
-        <button id="send-button" class="bg-blue-600 text-white px-4 py-2 rounded">Send</button>
-    </form>
+<body>
+    <div class="container">
+        <div class="messages">
+            <!-- message <div>s go here -->
+        </div>
+
+        <form class="chat-form">
+            <input id="message-input" class="message-input" type="text" placeholder="Type a message..."
+                autocomplete="off" />
+            <button class="send-button" type="submit">Send</button>
+        </form>
+
+    </div>
+
     <script type="module" src="/static/app.js"></script>
 </body>
 

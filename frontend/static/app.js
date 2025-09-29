@@ -1,15 +1,15 @@
 "use strict";
 
-const messages = document.querySelector("#messages");
-const chatForm = document.querySelector("#chat-form");
-const messageInput = document.querySelector("#message-input");
+const messages = document.querySelector(".messages");
+const chatForm = document.querySelector(".chat-form");
+const messageInput = document.querySelector(".message-input");
 
 const appendMessage = (text) => {
-    const textDiv = document.createElement('div');
-    textDiv.className = 'py-1';
-    textDiv.textContent = text;
-    messages.appendChild(textDiv);
-    messages.scrollTop = messages.scrollHeight;
+    const div = document.createElement('div');
+    // TODO: Get user ID, and if message from myself use "message-right".
+    div.className = 'message message-left';
+    div.textContent = text;
+    messages.prepend(div);
 };
 
 const ws = new WebSocket(`ws://${location.host}/ws`);
