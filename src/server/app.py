@@ -1,7 +1,11 @@
 import argparse
 import logging
+import multiprocessing
 import os
 from pathlib import Path
+import signal
+import sys
+from types import FrameType
 
 from aiohttp import web
 
@@ -57,6 +61,56 @@ def create_app(redis_url: str) -> web.Application:
     return app
 
 
+def run_worker(worker_id: int, host: str, port: int, redis_url: str) -> None:
+    setup_logging()
+
+    logger.info(f"[Worker {worker_id}] Starting on {host}:{port} (PID: {os.getpid()})")
+
+    app = create_app(redis_url)
+
+    web.run_app(
+        app,
+        host=host,
+        port=port,
+        reuse_port=True,
+        print=lambda *args: None,  # Suppress aiohttp's startup message per worker
+    )
+
+
+def shutdown_workers(
+    processes: list[multiprocessing.Process], timeout: int = 5
+) -> None:
+    logger.info("Shutting down %d workers...", len(processes))
+
+    for process in processes:
+        if process.is_alive():
+            process.terminate()
+
+    for process in processes:
+        process.join(timeout=timeout)
+
+        if process.is_alive():
+            logger.warning(
+                "Worker %s didn't stop after %d seconds, killing...",
+                timeout,
+                process.name,
+            )
+            process.kill()
+            process.join()
+
+    logger.info("All %d workers stopped", len(processes))
+
+
+def register_signal_handlers(processes: list[multiprocessing.Process]) -> None:
+    def signal_handler(signum: int, _: FrameType | None) -> None:
+        logger.info("Received signal %d", signum)
+        shutdown_workers(processes)
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="A multiuser webchat application")
 
@@ -79,25 +133,70 @@ def parse_args() -> argparse.Namespace:
         help="Redis connection URL (default: redis://localhost:6379, env: REDIS_URL)",
     )
 
+    def positive_integer(value: str) -> int:
+        try:
+            ivalue = int(value)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"{value} is not a valid integer")
+        if ivalue < 1:
+            raise argparse.ArgumentTypeError(f"{value} must be at least 1")
+        return ivalue
+
+    parser.add_argument(
+        "--workers",
+        type=positive_integer,
+        default=positive_integer(os.getenv("WORKERS", "1")),
+        help="Number of workers (must be at least 1, default: 1, env: WORKERS)",
+    )
+
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    host = args.host
-    port = args.port
-    redis_url = args.redis_url
-
-    logger.info("Starting server with address %s:%s...", host, port)
-    web.run_app(create_app(redis_url), host=host, port=port)
-
-
-if __name__ == "__main__":
+def setup_logging() -> None:
     logging.basicConfig(
         level=logging.INFO,
-        format="[{levelname:<8}] {asctime} ({name}.{funcName}) {message}",
+        format="[{levelname:<8}] {asctime} [PID:{process}] ({name}.{funcName}) {message}",
         style="{",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+
+def main() -> None:
+    args = parse_args()
+    host: str = args.host
+    port: int = args.port
+    redis_url: str = args.redis_url
+    workers: int = args.workers
+
+    if workers == 1:
+        logger.info("Starting server with address %s:%s...", host, port)
+        web.run_app(create_app(redis_url), host=host, port=port)
+        return
+
+    processes: list[multiprocessing.Process] = []
+    for worker_id in range(workers):
+        process = multiprocessing.Process(
+            target=run_worker,
+            args=(worker_id, host, port, redis_url),
+            name=f"worker-{worker_id}",
+        )
+        process.start()
+        logger.info("Started worker %d (PID: %d)", worker_id, process.pid)
+
+        processes.append(process)
+
+    register_signal_handlers(processes)
+
+    try:
+        for process in processes:
+            process.join()
+
+        shutdown_workers(processes)
+    except KeyboardInterrupt:
+        # Signal handler is already called at this point.
+        pass
+
+
+if __name__ == "__main__":
+    setup_logging()
     main()
