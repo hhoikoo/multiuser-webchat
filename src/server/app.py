@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 from pathlib import Path
@@ -56,11 +57,36 @@ def create_app(redis_url: str) -> web.Application:
     return app
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="A multiuser webchat application")
+
+    parser.add_argument(
+        "--host",
+        type=str,
+        default=os.getenv("HOST", "localhost"),
+        help="Host to bind to (default: localhost, env: HOST)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("PORT", "8080")),
+        help="Port to bind to (default: 8080, env: PORT)",
+    )
+    parser.add_argument(
+        "--redis-url",
+        type=str,
+        default=os.getenv("REDIS_URL", "redis://localhost:6379"),
+        help="Redis connection URL (default: redis://localhost:6379, env: REDIS_URL)",
+    )
+
+    return parser.parse_args()
+
+
 def main() -> None:
-    # TODO: Add argparse stuff?
-    host = os.getenv("HOST", "localhost")
-    port = int(os.getenv("PORT", "8080"))
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    args = parse_args()
+    host = args.host
+    port = args.port
+    redis_url = args.redis_url
 
     logger.info("Starting server with address %s:%s...", host, port)
     web.run_app(create_app(redis_url), host=host, port=port)
