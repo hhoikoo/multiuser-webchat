@@ -20,7 +20,8 @@ class PeerStatus(Enum):
     INTERNAL_ERROR = auto()
 
 
-TIMEOUT = 0.25
+WS_CLOSE_TIMEOUT = 2.0
+SEND_TIMEOUT = 0.25
 
 
 class WSMessageRouter:
@@ -66,6 +67,30 @@ class WSMessageRouter:
             await ws.close()
             logger.info("Successfully disconnected.")
 
+    async def close_all_connections(self) -> None:
+        if not self.clients:
+            logger.info("No active WebSocket connections to close")
+            return
+
+        logger.info("Closing %d active WebSocket connection(s)...", len(self.clients))
+
+        try:
+            clients_snapshot = tuple(self.clients)
+            closing_open_sockets = (
+                ws.close(code=WSCloseCode.GOING_AWAY, message=b"Server shutting down")
+                for ws in clients_snapshot
+                if not ws.closed
+            )
+            await asyncio.wait_for(
+                asyncio.gather(*closing_open_sockets, return_exceptions=True),
+                timeout=WS_CLOSE_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            # Best-effort socket shutdown. Process is terminating anyway.
+            logger.warning("Timeout while closing WebSocket connections")
+
+        self.clients.clear()
+
     async def _handle_text(self, message: WSMessage) -> None:
         data = message.data
 
@@ -105,12 +130,12 @@ class WSMessageRouter:
             return PeerStatus.CLOSED
 
         try:
-            await asyncio.wait_for(peer.send_str(payload), timeout=TIMEOUT)
+            await asyncio.wait_for(peer.send_str(payload), timeout=SEND_TIMEOUT)
         except TimeoutError:
             logger.warning(
                 "Connection to %s timed out after %s seconds while sending message %s.",
                 peer,
-                TIMEOUT,
+                SEND_TIMEOUT,
                 payload,
             )
             asyncio.create_task(

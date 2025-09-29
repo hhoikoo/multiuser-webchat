@@ -9,7 +9,7 @@ from types import FrameType
 
 from aiohttp import web
 
-from server.ws import install_ws_router
+from server.ws import WSMessageRouter, install_ws_router
 from server.redis import RedisManager, install_redis_manager
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,11 @@ async def on_startup(app: web.Application) -> None:
 
 
 async def on_cleanup(app: web.Application) -> None:
+    ws_router: WSMessageRouter = app["ws_router"]
+    logger.info("Closing all open WebSocket connections...")
+    await ws_router.close_all_connections()
+    logger.info("Successfully closed all WebSocket connections!")
+
     redis_manager: RedisManager = app["redis_manager"]
     logger.info("Disconnecting to Redis...")
     await redis_manager.disconnect()
