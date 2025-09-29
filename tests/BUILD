@@ -1,0 +1,32 @@
+python_tests(
+    name="unit_tests",
+    sources=[
+        "test_models.py",
+        "test_redis.py",
+        "test_ws.py",
+    ],
+    dependencies=[
+        "src/server:lib",
+        "//:requirements#pytest",
+        "//:requirements#aiohttp",
+        "//:requirements#redis",
+    ],
+)
+
+python_tests(
+    name="e2e_tests",
+    sources=["test_e2e.py"],
+    dependencies=[
+        "src/server:lib",
+        "//:requirements#pytest",
+        "//:requirements#aiohttp",
+    ],
+)
+
+python_tests(
+    name="all_tests",
+    dependencies=[
+        ":unit_tests",
+        ":e2e_tests",
+    ],
+)

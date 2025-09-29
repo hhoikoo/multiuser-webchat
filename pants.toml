@@ -9,7 +9,7 @@ backend_packages = [
 pythonpath = []
 
 [source]
-root_patterns = ["src", "frontend"]
+root_patterns = ["src", "frontend", "tests"]
 
 [python]
 interpreter_constraints = ["CPython==3.13.*"]
