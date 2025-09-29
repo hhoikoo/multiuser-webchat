@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-import json
-from typing import Awaitable, Callable, TypedDict
+import logging
+from typing import Awaitable, Callable
 
 import asyncio
 import redis.asyncio as redis
 from aiohttp import web
 
+from server.models import ChatMessage
 
-class ChatMessage(TypedDict):
-    text: str
-    type: str
-    ts: int
+logger = logging.getLogger(__name__)
 
 
 MessageHandler = Callable[[ChatMessage], Awaitable[None]]
@@ -31,7 +29,7 @@ class RedisManager:
             # TODO: Change to a warning and just return instead?
             raise RuntimeError("Attempting to connnect to Redis client twice!")
 
-        self.client = redis.Redis.from_url(
+        self.client = redis.Redis.from_url(  # pyright: ignore[reportUnknownMemberType]
             url=self.redis_url,
             encoding="utf-8",
             decode_responses=True,
@@ -55,8 +53,8 @@ class RedisManager:
         if not self.client:
             raise RuntimeError("Redis client not connected!")
 
-        payload = json.dumps(message)
-        await self.client.publish(self.CHANNEL, payload)
+        payload = message.to_json()
+        await self.client.publish(self.CHANNEL, payload)  # pyright: ignore[reportUnknownMemberType]
 
     async def start_listen(self) -> None:
         if not self.client:
@@ -68,29 +66,41 @@ class RedisManager:
         assert self.client
 
         try:
-            async with self.client.pubsub() as pubsub:
-                await pubsub.subscribe(self.CHANNEL)
+            async with self.client.pubsub() as pubsub:  # pyright: ignore[reportUnknownMemberType]
+                await pubsub.subscribe(self.CHANNEL)  # pyright: ignore[reportUnknownMemberType]
 
-                async for message in pubsub.listen():
+                async for message in pubsub.listen():  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
                     if message["type"] == "message":
                         try:
-                            data = json.loads(message["data"])
+                            data = ChatMessage.from_json(message["data"])  # pyright: ignore[reportUnknownArgumentType]
                             if self._message_handler:
                                 await self._message_handler(data)
-                        except json.JSONDecodeError:
-                            # TODO: Log warning for invalid JSON.
-                            continue
+                        except ValueError:
+                            logger.exception(
+                                "Failed to parse message with data %s!",
+                                message["data"],  # pyright: ignore[reportUnknownArgumentType]
+                            )
                         except Exception:
-                            # TODO: Log generic warning.
-                            continue
+                            logger.exception(
+                                "Unknown exception occured while receiving message %s.",
+                                message,  # pyright: ignore[reportUnknownArgumentType]
+                            )
+                    elif message["type"] == "subscribe":
+                        logger.debug(
+                            "Subscribe message received. message=%s",
+                            message,  # pyright: ignore[reportUnknownArgumentType]
+                        )
                     else:
-                        # TODO: Log warning for unknown message type
-                        continue
-        except asyncio.CancelledError:
-            # TODO: Log cancellation before reraising.
-            raise
+                        logger.warning(
+                            "Unknown message type %s! message=%s",
+                            message["type"],  # pyright: ignore[reportUnknownArgumentType]
+                            message,  # pyright: ignore[reportUnknownArgumentType]
+                        )
+        except asyncio.CancelledError as exc:
+            logger.info("Client listener is cancelled.")
+            raise exc
         except Exception:
-            # TODO: Log error
+            logger.exception("Unknown exception occured during listening loop.")
             return
 
 

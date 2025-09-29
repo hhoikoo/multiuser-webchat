@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -6,19 +7,26 @@ from aiohttp import web
 from server.ws import install_ws_router
 from server.redis import RedisManager, install_redis_manager
 
+logger = logging.getLogger(__name__)
+
 
 STATIC_RESOURCES_DIR = Path(__file__).resolve().parent.parent / "static"
 
 
 async def on_startup(app: web.Application) -> None:
     redis_manager: RedisManager = app["redis_manager"]
+    logger.info("Connecting to Redis...")
     await redis_manager.connect()
+    logger.info("Redis connected! Establishing pubsub connection...")
     await redis_manager.start_listen()
+    logger.info("The server is now ready to listen to Redis messages!")
 
 
 async def on_cleanup(app: web.Application) -> None:
     redis_manager: RedisManager = app["redis_manager"]
+    logger.info("Disconnecting to Redis...")
     await redis_manager.disconnect()
+    logger.info("Successfully disconnected to Redis!")
 
 
 async def healthz(_: web.Request) -> web.Response:
@@ -50,11 +58,20 @@ def create_app(redis_url: str) -> web.Application:
 
 def main() -> None:
     # TODO: Add argparse stuff?
+    host = os.getenv("HOST", "localhost")
     port = int(os.getenv("PORT", "8080"))
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
 
-    web.run_app(create_app(redis_url), host="localhost", port=port)
+    logger.info("Starting server with address %s:%s...", host, port)
+    web.run_app(create_app(redis_url), host=host, port=port)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[{levelname:<8}] {asctime} ({name}.{funcName}) {message}",
+        style="{",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     main()
