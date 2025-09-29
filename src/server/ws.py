@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum, auto
 import json
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -7,10 +8,22 @@ from typing import AsyncGenerator
 from aiohttp import web, WSMsgType, WSMessage, WSCloseCode
 import asyncio
 
+from server.redis import ChatMessage, RedisManager
+
+
+class PeerStatus(Enum):
+    OK = auto()
+    CLOSED = auto()
+    TIMEOUT = auto()
+    INTERNAL_ERROR = auto()
+
 
 class WSMessageRouter:
-    def __init__(self) -> None:
+    def __init__(self, redis_manager: RedisManager) -> None:
         self.clients: set[web.WebSocketResponse] = set()
+        self.redis = redis_manager
+
+        self.redis.set_message_handler(self._broadcast_to_local_peers)
 
     async def handler(self, req: web.Request) -> web.StreamResponse:
         async with self._initialize_ws(req) as ws:
@@ -44,55 +57,61 @@ class WSMessageRouter:
         data = message.data
 
         try:
-            obj = json.loads(data)
+            obj: ChatMessage = json.loads(data)
             assert isinstance(obj, dict) and "text" in obj
         except Exception:
             # Drop garbage input instead of crashing the room.
             # TODO: Handle errors more gracefully.
             return
 
-        # TODO: Use Redis for broadcasting to clients.
-        await self._broadcast_local(json.dumps(obj))
+        await self.redis.publish_message(obj)
 
-    async def _broadcast_local(self, payload: str) -> None:
-        clients_to_drop: list[web.WebSocketResponse] = []
+    async def _broadcast_to_local_peers(self, message: ChatMessage) -> None:
+        payload = json.dumps(message)
 
         # Snapshotting the clients set is necessary here, as during await a
         # client can disconnect, causing a mutation of the clients set, which
         # will cause the iteration to fail.
         clients_snapshot = tuple(self.clients)
-        for peer in clients_snapshot:
-            if peer.closed:
-                clients_to_drop.append(peer)
-                continue
 
-            try:
-                # TODO: Use asyncio.gather() to await on many client writes at
-                # the same time?
-                await asyncio.wait_for(peer.send_str(payload), timeout=0.25)
-            except TimeoutError:
-                asyncio.create_task(
-                    peer.close(
-                        code=WSCloseCode.GOING_AWAY,
-                        message=b"Send timeout",
-                    )
+        broadcast_results = await asyncio.gather(
+            *(self._send_to_peer(peer, payload) for peer in clients_snapshot)
+        )
+
+        for peer, result in zip(clients_snapshot, broadcast_results):
+            if result != PeerStatus.OK:
+                self.clients.discard(peer)
+
+    async def _send_to_peer(
+        self, peer: web.WebSocketResponse, payload: str
+    ) -> PeerStatus:
+        if peer.closed:
+            return PeerStatus.CLOSED
+
+        try:
+            await asyncio.wait_for(peer.send_str(payload), timeout=0.25)
+        except TimeoutError:
+            asyncio.create_task(
+                peer.close(
+                    code=WSCloseCode.GOING_AWAY,
+                    message=b"Send timeout",
                 )
-                clients_to_drop.append(peer)
-            except Exception:
-                # TODO: Hard-exit for unexpected error?
-                asyncio.create_task(
-                    peer.close(
-                        code=WSCloseCode.INTERNAL_ERROR,
-                        message=b"Unknown internal error",
-                    )
+            )
+            return PeerStatus.TIMEOUT
+        except Exception:
+            # TODO: Hard-exit for unexpected error?
+            asyncio.create_task(
+                peer.close(
+                    code=WSCloseCode.INTERNAL_ERROR,
+                    message=b"Unknown internal error",
                 )
-                clients_to_drop.append(peer)
+            )
+            return PeerStatus.INTERNAL_ERROR
 
-        for peer in clients_to_drop:
-            self.clients.discard(peer)
+        return PeerStatus.OK
 
 
-def install_ws_router(app: web.Application) -> None:
-    router = WSMessageRouter()
+def install_ws_router(app: web.Application, redis_manager: RedisManager) -> None:
+    router = WSMessageRouter(redis_manager)
     app["ws_router"] = router
     app.router.add_get("/ws", router.handler)
