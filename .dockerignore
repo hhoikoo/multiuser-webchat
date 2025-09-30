@@ -55,6 +55,9 @@ Dockerfile*
 .dockerignore
 docker-compose*.yml
 
+# Nginx
+nginx.conf
+
 # Documentation (not needed in container)
 README.md
 docs/
