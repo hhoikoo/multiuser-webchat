@@ -28,7 +28,7 @@ jobs:
           cache-lmdb-store: "true"
 
       - name: Run Ruff format check
-        run: "pants fmt --check ::"
+        run: "pants fmt ::"
 
       - name: Run Ruff lint
         run: "pants lint ::"
