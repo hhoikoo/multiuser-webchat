@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+htmlcov/
+.hypothesis/
+cover/
+.pytype/
+.pyre/
+cython_debug/
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+.pixi/
+
+# Pants
+.pants.d/
+dist/
+.pids/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# Documentation (not needed in container)
+README.md
+docs/
+
+# CI/CD
+.github/
+
+# Tests (copied but not needed in image)
+tests/
+**/test_*.py
+**/*_test.py
+
+# Environment and secrets
+.env
+.env.*
+.envrc
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+.tmp/
+
+# Additional config files not needed in container
+.python-version
+LICENSE
