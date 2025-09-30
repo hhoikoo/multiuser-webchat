@@ -49,8 +49,8 @@ A real-time multi-user webchat application built with Python (aiohttp), Redis, a
 - **Docker Compose**: Version 2.0 or higher
 
 ### For Local Development (Optional)
-- **Python**: 3.13.x
-- **Pants**: Build system (automatically installed via script)
+- **Python**: 3.13.x (Recommended: [pyenv](https://github.com/pyenv/pyenv#installation))
+- **Pants**: Build system ([link](https://www.pantsbuild.org/dev/docs/getting-started/installing-pants))
 - **Redis**: For local Redis instance (if not using Docker)
 
 ## Quick Start
@@ -101,11 +101,10 @@ For development without Docker:
 
 1. **Install dependencies**:
    ```bash
-   # Pants will be automatically installed
-   ./pants --version
+   pants --version
    ```
 
-2. **Start Redis** (required):
+2. **Start Redis**:
    ```bash
    # Using Docker
    docker run -d -p 6379:6379 redis:7-alpine
@@ -117,7 +116,7 @@ For development without Docker:
 3. **Run the application**:
    ```bash
    # Development mode
-   ./pants run src/server:app -- --host 0.0.0.0 --port 8080 --workers 1
+   pants run src/server:app -- --host 0.0.0.0 --port 8080 --workers 1 --redis-url redis://localhost:6379
 
    # Or build and run PEX
    ./pants package src/server:app
@@ -137,12 +136,12 @@ You can customize the application behavior using environment variables:
 | `PORT` | `8080` | Server port |
 | `WORKERS` | `1` | Number of worker processes |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-| `WEB_REPLICAS` | `4` | Number of web service replicas in Docker Compose |
+| `WEB_REPLICAS` | `4` | (Only in `docker-compose`) Number of web service replicas |
 
 Example:
 ```bash
 # Run with custom settings
-HOST=127.0.0.1 PORT=3000 WORKERS=4 ./pants run src/server:app
+HOST=127.0.0.1 PORT=3000 WORKERS=4 pants run src/server:app
 ```
 
 ## Development
@@ -175,36 +174,36 @@ Run linting and type checking:
 
 ```bash
 # Format code
-./pants fmt ::
+pants fmt ::
 
 # Lint code
-./pants lint ::
+pants lint ::
 
 # Type check
-./pants check ::
+pants check ::
 
 # Run all checks
-./pants fmt lint check ::
+pants fmt lint check ::
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-./pants test ::
+pants test ::
 
 # Run specific test
-./pants test tests/test_example.py
+pants test tests/test_example.py
 
 # Run tests with coverage
-./pants test --coverage-report=html ::
+pants test --coverage-report=html ::
 ```
 
 ### Building
 
 ```bash
 # Build PEX executable
-./pants package src/server:app
+pants package src/server:app
 
 # Build Docker image
 docker build -t chat-app:latest .
@@ -275,8 +274,8 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature-name`
-3. Make your changes and ensure tests pass: `./pants test ::`
-4. Run code quality checks: `./pants fmt lint check ::`
+3. Make your changes and ensure tests pass: `pants test ::`
+4. Run code quality checks: `pants fmt lint check ::`
 5. Commit your changes: `git commit -am 'Add feature'`
 6. Push to the branch: `git push origin feature-name`
 7. Submit a pull request
