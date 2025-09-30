@@ -12,28 +12,113 @@ const appendMessage = (text) => {
     messages.prepend(div);
 };
 
-const ws = new WebSocket(`ws://${location.host}/ws`);
-ws.addEventListener('open', () => appendMessage('[connected]'));
-ws.addEventListener('close', () => appendMessage('[disconnected]'));
-ws.addEventListener('message', (e) => {
-    try {
-        const { text } = JSON.parse(e.data);
-        appendMessage(text);
-    } catch {
-        appendMessage(e.data);
+class WebSocketManager {
+    static MAX_RECONNECT_ATTEMPTS = 5;
+    static BASE_RECONNECT_DELAY = 1000; // 1 second
+    static MAX_RECONNECT_DELAY = 30000; // 30 seconds
+
+    constructor(url) {
+        this.url = url;
+        this.ws = null;
+        this.reconnectAttempts = 0;
+        this.reconnectTimer = null;
+        this.isManualClose = false;
+
+        this.connect();
     }
-});
+
+    connect() {
+        try {
+            this.ws = new WebSocket(this.url);
+            this.setupEventListeners();
+        } catch (error) {
+            console.error('WebSocket connection error:', error);
+            this.handleReconnect();
+        }
+    }
+
+    setupEventListeners() {
+        this.ws.addEventListener('open', () => {
+            appendMessage('[connected]');
+            this.reconnectAttempts = 0; // Reset attempts on successful connection
+        });
+
+        this.ws.addEventListener('close', () => {
+            if (!this.isManualClose) {
+                appendMessage('[disconnected]');
+                this.handleReconnect();
+            }
+        });
+
+        this.ws.addEventListener('error', (error) => {
+            console.error('WebSocket error:', error);
+        });
+
+        this.ws.addEventListener('message', (e) => {
+            try {
+                const { text } = JSON.parse(e.data);
+                appendMessage(text);
+            } catch {
+                appendMessage(e.data);
+            }
+        });
+    }
+
+    handleReconnect() {
+        if (this.reconnectAttempts >= WebSocketManager.MAX_RECONNECT_ATTEMPTS) {
+            appendMessage(`[reconnection failed after ${WebSocketManager.MAX_RECONNECT_ATTEMPTS} attempts]`);
+            return;
+        }
+
+        this.reconnectAttempts++;
+        const delay = Math.min(
+            WebSocketManager.BASE_RECONNECT_DELAY * Math.pow(2, this.reconnectAttempts - 1),
+            WebSocketManager.MAX_RECONNECT_DELAY
+        );
+
+        appendMessage(`[reconnecting in ${delay / 1000}s... (attempt ${this.reconnectAttempts}/${WebSocketManager.MAX_RECONNECT_ATTEMPTS})]`);
+
+        this.reconnectTimer = setTimeout(() => {
+            this.connect();
+        }, delay);
+    }
+
+    send(data) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(data);
+            return true;
+        }
+        return false;
+    }
+
+    close() {
+        this.isManualClose = true;
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        if (this.ws) {
+            this.ws.close();
+        }
+    }
+
+    isConnected() {
+        return this.ws && this.ws.readyState === WebSocket.OPEN;
+    }
+}
+
+const wsManager = new WebSocketManager(`ws://${location.host}/ws`);
 
 chatForm.addEventListener('submit', (e) => {
     e.preventDefault();
 
     const text = messageInput.value.trim();
-    if (!text || ws.readyState !== WebSocket.OPEN) {
+    if (!text || !wsManager.isConnected()) {
         // TODO: Display failure message or alert?
         return;
     }
 
-    ws.send(JSON.stringify({ type: 'chat', text, ts: Date.now() }));
+    wsManager.send(JSON.stringify({ type: 'chat', text, ts: Date.now() }));
 
     messageInput.value = '';
     messageInput.focus();
