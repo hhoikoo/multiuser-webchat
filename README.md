@@ -106,6 +106,19 @@ docker compose up -d
 
 For development without Docker:
 
+1. **Set up Python environment**:
+
+   ```bash
+   # Install Python 3.13 with pyenv
+   pyenv install 3.13.0
+
+   # Set local Python version for this project
+   pyenv local 3.13.0
+
+   # Verify Python version
+   python --version
+   ```
+
 1. **Install dependencies**:
 
    ```bash
