@@ -112,7 +112,7 @@ class TestRedisManager:
         mock_client = AsyncMock()
         redis_manager.client = mock_client
 
-        with patch.object(redis_manager, "_listen_loop") as mock_listen_loop:
+        with patch.object(redis_manager, "_listen_loop"):
             await redis_manager.start_listen()
 
             assert redis_manager._listener_task is not None
@@ -183,7 +183,7 @@ class TestRedisManager:
         mock_client.pubsub.return_value.__aexit__.return_value = None
 
         # Mock listen that raises CancelledError
-        async def mock_listen():
+        async def mock_listen() -> AsyncMock:  # type: ignore[misc]
             yield {"type": "subscribe", "data": None}
             raise asyncio.CancelledError()
 

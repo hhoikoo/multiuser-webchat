@@ -1,4 +1,5 @@
 import asyncio
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -6,6 +7,12 @@ from aiohttp import WSCloseCode, WSMessage, WSMsgType
 
 from server.models import ChatMessage
 from server.ws import SEND_TIMEOUT, WS_CLOSE_TIMEOUT, PeerStatus, WSMessageRouter
+
+# Test constants
+EXPECTED_CALL_COUNT = 2
+EXPECTED_CLIENT_COUNT = 2
+EXPECTED_SEND_TIMEOUT = 0.25
+EXPECTED_WS_CLOSE_TIMEOUT = 2.0
 
 
 class TestPeerStatus:
@@ -18,13 +25,13 @@ class TestPeerStatus:
 
 class TestWSMessageRouter:
     @pytest.fixture
-    def mock_redis_manager(self) -> AsyncMock:
-        mock = AsyncMock()
-        mock.publish_message = AsyncMock()
+    def mock_redis_manager(self) -> MagicMock:
+        mock = MagicMock()
+        mock.publish_message = MagicMock()
         return mock
 
     @pytest.fixture
-    def ws_router(self, mock_redis_manager: AsyncMock) -> WSMessageRouter:
+    def ws_router(self, mock_redis_manager: MagicMock) -> WSMessageRouter:
         return WSMessageRouter(mock_redis_manager)
 
     @pytest.fixture
@@ -39,7 +46,7 @@ class TestWSMessageRouter:
     def sample_message(self) -> ChatMessage:
         return ChatMessage(text="Test message", type="message", ts=1234567890)
 
-    def test_init(self, mock_redis_manager: AsyncMock) -> None:
+    def test_init(self, mock_redis_manager: MagicMock) -> None:
         router = WSMessageRouter(mock_redis_manager)
 
         assert router.redis == mock_redis_manager
@@ -63,9 +70,9 @@ class TestWSMessageRouter:
 
             await ws_router._broadcast_to_local_peers(sample_message)
 
-            assert mock_send.call_count == 2
+            assert mock_send.call_count == EXPECTED_CALL_COUNT
             # Both clients should still be in the set
-            assert len(ws_router.clients) == 2
+            assert len(ws_router.clients) == EXPECTED_CLIENT_COUNT
 
     async def test_broadcast_removes_failed_clients(
         self, ws_router: WSMessageRouter, sample_message: ChatMessage
@@ -146,8 +153,9 @@ class TestWSMessageRouter:
 
         await ws_router._handle_text(message)
 
-        ws_router.redis.publish_message.assert_called_once()
-        published_msg = ws_router.redis.publish_message.call_args[0][0]
+        mock_publish = cast(MagicMock, ws_router.redis.publish_message)
+        mock_publish.assert_called_once()
+        published_msg = mock_publish.call_args[0][0]
         assert published_msg.text == sample_message.text
         assert published_msg.type == sample_message.type
         assert published_msg.ts == sample_message.ts
@@ -159,7 +167,8 @@ class TestWSMessageRouter:
         await ws_router._handle_text(message)
 
         # Should not publish anything
-        ws_router.redis.publish_message.assert_not_called()
+        mock_publish = cast(MagicMock, ws_router.redis.publish_message)
+        mock_publish.assert_not_called()
 
     async def test_handle_text_missing_fields(self, ws_router: WSMessageRouter) -> None:
         message = WSMessage(
@@ -170,7 +179,8 @@ class TestWSMessageRouter:
         await ws_router._handle_text(message)
 
         # Should not publish anything
-        ws_router.redis.publish_message.assert_not_called()
+        mock_publish = cast(MagicMock, ws_router.redis.publish_message)
+        mock_publish.assert_not_called()
 
     async def test_close_all_connections_empty(
         self, ws_router: WSMessageRouter
@@ -236,5 +246,5 @@ class TestWSMessageRouter:
         mock_ws.close.assert_called_once()
 
     def test_constants(self) -> None:
-        assert SEND_TIMEOUT == 0.25
-        assert WS_CLOSE_TIMEOUT == 2.0
+        assert SEND_TIMEOUT == EXPECTED_SEND_TIMEOUT
+        assert WS_CLOSE_TIMEOUT == EXPECTED_WS_CLOSE_TIMEOUT

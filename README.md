@@ -49,6 +49,7 @@ A real-time multi-user webchat application built with Python (aiohttp), Redis, a
 - **Docker Compose**: Version 2.0 or higher
 
 ### For Local Development (Optional)
+
 - **Python**: 3.13.x (Recommended: [pyenv](https://github.com/pyenv/pyenv#installation))
 - **Pants**: Build system ([link](https://www.pantsbuild.org/dev/docs/getting-started/installing-pants))
 - **Redis**: For local Redis instance (if not using Docker)
@@ -58,25 +59,29 @@ A real-time multi-user webchat application built with Python (aiohttp), Redis, a
 ### Using Docker Compose (Recommended)
 
 1. **Clone the repository**:
+
    ```bash
    git clone <repository-url>
    cd multiuser-webchat
    ```
 
-2. **Start the application**:
+1. **Start the application**:
+
    ```bash
    docker compose up -d
    ```
 
-3. **Access the application**:
+1. **Access the application**:
    Open your browser and navigate to `http://localhost:8080`
 
-4. **Scale the application** (optional):
+1. **Scale the application** (optional):
+
    ```bash
    WEB_REPLICAS=8 docker compose up -d --scale web=8
    ```
 
-5. **Stop the application**:
+1. **Stop the application**:
+
    ```bash
    docker compose down
    ```
@@ -100,11 +105,13 @@ docker compose up -d
 For development without Docker:
 
 1. **Install dependencies**:
+
    ```bash
    pants --version
    ```
 
-2. **Start Redis**:
+1. **Start Redis**:
+
    ```bash
    # Using Docker
    docker run -d -p 6379:6379 redis:7-alpine
@@ -113,7 +120,8 @@ For development without Docker:
    redis-server
    ```
 
-3. **Run the application**:
+1. **Run the application**:
+
    ```bash
    # Development mode
    pants run src/server:app -- --host 0.0.0.0 --port 8080 --workers 1 --redis-url redis://localhost:6379
@@ -123,28 +131,91 @@ For development without Docker:
    python dist/src.server/app.pex --host 0.0.0.0 --port 8080
    ```
 
-4. **Access the application**:
+1. **Access the application**:
    Open your browser and navigate to `http://localhost:8080`
 
 ### Environment Variables
 
 You can customize the application behavior using environment variables:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Server bind address |
-| `PORT` | `8080` | Server port |
-| `WORKERS` | `1` | Number of worker processes |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-| `WEB_REPLICAS` | `4` | (Only in `docker-compose`) Number of web service replicas |
+| Variable       | Default                  | Description                                               |
+| -------------- | ------------------------ | --------------------------------------------------------- |
+| `HOST`         | `0.0.0.0`                | Server bind address                                       |
+| `PORT`         | `8080`                   | Server port                                               |
+| `WORKERS`      | `1`                      | Number of worker processes                                |
+| `REDIS_URL`    | `redis://localhost:6379` | Redis connection URL                                      |
+| `WEB_REPLICAS` | `4`                      | (Only in `docker-compose`) Number of web service replicas |
 
 Example:
+
 ```bash
 # Run with custom settings
 HOST=127.0.0.1 PORT=3000 WORKERS=4 pants run src/server:app
 ```
 
 ## Development
+
+### Setting Up Pre-Commit Hooks
+
+This project uses [pre-commit](https://pre-commit.com/) to automatically run code quality checks before each commit.
+
+#### Installation
+
+1. **Install pre-commit**:
+
+   ```bash
+   # Using pip
+   pip install pre-commit
+
+   # Or using Homebrew (macOS)
+   brew install pre-commit
+   ```
+
+1. **Install the git hook scripts**:
+
+   ```bash
+   pre-commit install
+   ```
+
+1. **Verify installation** (optional):
+
+   ```bash
+   # Run against all files to test
+   pre-commit run --all-files
+   ```
+
+#### Usage
+
+Once installed, pre-commit hooks run automatically before each commit. If any checks fail:
+
+1. Review the error messages
+1. Fix the issues (many are auto-fixed)
+1. Stage the fixed files: `git add .`
+1. Commit again: `git commit -m "your message"`
+
+#### Manual Execution
+
+Run hooks manually without committing:
+
+```bash
+# Run on all files
+pre-commit run --all-files
+
+# Run on specific files
+pre-commit run --files src/server/app.py
+
+# Run a specific hook
+pre-commit run pants-fmt --all-files
+```
+
+#### Updating Hooks
+
+Keep hooks up to date:
+
+```bash
+# Update to latest versions
+pre-commit autoupdate
+```
 
 ### Project Structure
 
@@ -214,16 +285,19 @@ docker build -t chat-app:latest .
 ### Production Considerations
 
 1. **Security**:
+
    - Use HTTPS in production (configure SSL termination at Nginx or load balancer)
    - Set secure environment variables
    - Consider using Redis AUTH for Redis connections
 
-2. **Scaling**:
+1. **Scaling**:
+
    - Adjust `WEB_REPLICAS` based on expected load
    - Monitor Redis memory usage and configure persistence if needed
    - Consider Redis Cluster for high availability
 
-3. **Monitoring**:
+1. **Monitoring**:
+
    - Application exposes health check endpoints at `/healthz`
    - Monitor Docker container health status
    - Set up logging aggregation for distributed logs
@@ -248,15 +322,18 @@ docker compose ps
 ### Common Issues
 
 1. **WebSocket connection failed**:
+
    - Ensure Redis is running and accessible
    - Check Docker container logs: `docker compose logs web`
    - Verify port 8080 is not in use by another application
 
-2. **Messages not appearing for all users**:
+1. **Messages not appearing for all users**:
+
    - Confirm Redis is properly configured for pub/sub
    - Check that multiple application instances are connecting to the same Redis instance
 
-3. **Build failures**:
+1. **Build failures**:
+
    - Ensure Python 3.13 is available in the build environment
    - Check that all dependencies in `pyproject.toml` are accessible
 
@@ -273,9 +350,9 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Make your changes and ensure tests pass: `pants test ::`
-4. Run code quality checks: `pants fmt lint check ::`
-5. Commit your changes: `git commit -am 'Add feature'`
-6. Push to the branch: `git push origin feature-name`
-7. Submit a pull request
+1. Create a feature branch: `git checkout -b feature-name`
+1. Make your changes and ensure tests pass: `pants test ::`
+1. Run code quality checks: `pants fmt lint check ::`
+1. Commit your changes: `git commit -am 'Add feature'`
+1. Push to the branch: `git push origin feature-name`
+1. Submit a pull request

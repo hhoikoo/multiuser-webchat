@@ -1,34 +1,44 @@
 import json
+from dataclasses import FrozenInstanceError
 
 import pytest
 
 from server.models import ChatMessage
 
+# Test constants
+SAMPLE_TIMESTAMP_1 = 1234567890
+SAMPLE_TIMESTAMP_2 = 9876543210
+SAMPLE_TIMESTAMP_3 = 1111111111
+
 
 class TestChatMessage:
     def test_create_chat_message(self) -> None:
-        message = ChatMessage(text="Hello world", type="message", ts=1234567890)
+        message = ChatMessage(text="Hello world", type="message", ts=SAMPLE_TIMESTAMP_1)
 
         assert message.text == "Hello world"
         assert message.type == "message"
-        assert message.ts == 1234567890
+        assert message.ts == SAMPLE_TIMESTAMP_1
 
     def test_to_json(self) -> None:
-        message = ChatMessage(text="Test message", type="broadcast", ts=9876543210)
+        message = ChatMessage(
+            text="Test message", type="broadcast", ts=SAMPLE_TIMESTAMP_2
+        )
         json_str = message.to_json()
 
         parsed = json.loads(json_str)
         assert parsed["text"] == "Test message"
         assert parsed["type"] == "broadcast"
-        assert parsed["ts"] == 9876543210
+        assert parsed["ts"] == SAMPLE_TIMESTAMP_2
 
     def test_from_json_valid(self) -> None:
-        json_str = '{"text": "From JSON", "type": "alert", "ts": 1111111111}'
+        json_str = (
+            f'{{"text": "From JSON", "type": "alert", "ts": {SAMPLE_TIMESTAMP_3}}}'
+        )
         message = ChatMessage.from_json(json_str)
 
         assert message.text == "From JSON"
         assert message.type == "alert"
-        assert message.ts == 1111111111
+        assert message.ts == SAMPLE_TIMESTAMP_3
 
     def test_from_json_invalid_json(self) -> None:
         with pytest.raises(ValueError):
@@ -54,7 +64,7 @@ class TestChatMessage:
     def test_frozen_dataclass(self) -> None:
         message = ChatMessage(text="Immutable", type="test", ts=123)
 
-        with pytest.raises(Exception):  # Should be FrozenInstanceError
+        with pytest.raises(FrozenInstanceError):
             message.text = "Changed"  # type: ignore[misc]
 
     def test_keyword_only_constructor(self) -> None:
