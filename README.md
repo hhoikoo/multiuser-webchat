@@ -1,5 +1,7 @@
 # Multiuser Webchat
 
+[![CI](https://github.com/hhoikoo/multiuser-webchat/actions/workflows/ci.yml/badge.svg)](https://github.com/hhoikoo/multiuser-webchat/actions/workflows/ci.yml)
+
 (README generated with Claude Code)
 
 A real-time multi-user webchat application built with Python (aiohttp), Redis, and vanilla JavaScript. This application demonstrates modern web technologies including WebSockets, containerization, and load balancing.
@@ -343,6 +345,18 @@ docker compose ps
 - **Nginx**: Monitors application health and fails over accordingly
 - **Redis**: Built-in health check via `redis-cli ping`
 
+## Continuous Integration
+
+This project uses GitHub Actions for automated CI/CD. The pipeline runs on every push and pull request, checking:
+
+- Code formatting and linting (Ruff)
+- Type checking (MyPy)
+- Tests with Redis integration
+- Security scanning (Gitleaks)
+- Application builds (PEX and Docker)
+
+Check the [Actions tab](https://github.com/hhoikoo/multiuser-webchat/actions) to view workflow runs. CI checks must pass before pull requests can be merged.
+
 ## License
 
 This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
@@ -355,4 +369,4 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 1. Run code quality checks: `pants fmt lint check ::`
 1. Commit your changes: `git commit -am 'Add feature'`
 1. Push to the branch: `git push origin feature-name`
-1. Submit a pull request
+1. Submit a pull request (CI will run automatically)
