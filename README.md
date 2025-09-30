@@ -1,4 +1,4 @@
-# Bootcamp Webchat
+# Multiuser Webchat
 
 (README generated with Claude Code)
 
@@ -60,7 +60,7 @@ A real-time multi-user webchat application built with Python (aiohttp), Redis, a
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
-   cd bootcamp-webchat
+   cd multiuser-webchat
    ```
 
 2. **Start the application**:
@@ -149,7 +149,7 @@ HOST=127.0.0.1 PORT=3000 WORKERS=4 pants run src/server:app
 ### Project Structure
 
 ```
-bootcamp-webchat/
+multiuser-webchat/
 ├── src/server/           # Python backend application
 │   ├── app.py           # Main application entry point
 │   ├── ws.py            # WebSocket handling
