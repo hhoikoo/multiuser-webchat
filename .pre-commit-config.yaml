@@ -1,0 +1,157 @@
+# Pre-commit hooks configuration for webchat project
+# Based on: https://gatlenculp.medium.com/effortless-code-quality-the-ultimate-pre-commit-hooks-guide-for-2025-57ca501d9835
+# Documentation: https://pre-commit.com
+
+exclude: |
+  (?x)^(
+      .*cache.*/.*|       # Exclude cache directories
+      .*venv.*/.*|        # Exclude virtual environment directories
+      \.pants\.d/.*|      # Exclude pants cache
+      dist/.*|            # Exclude build artifacts
+      \.mypy_cache/.*|    # Exclude mypy cache
+  )$
+
+fail_fast: false
+default_language_version:
+  python: python3.13
+default_install_hook_types:
+  - pre-commit
+
+repos:
+  # ============================================================================
+  # Git Hooks
+  # ============================================================================
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+        name: "[🌳 git          ] Detect merge conflict markers"
+      - id: check-added-large-files
+        name: "[🌳 git          ] Block large file commits"
+        args: ["--maxkb=5000"]
+
+  # ============================================================================
+  # Filesystem Hooks
+  # ============================================================================
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-executables-have-shebangs
+        name: "[📁 filesystem   ] Verify shebang presence"
+      - id: check-shebang-scripts-are-executable
+        name: "[📁 filesystem   ] Verify script permissions"
+      - id: check-case-conflict
+        name: "[📁 filesystem   ] Check case sensitivity"
+      - id: trailing-whitespace
+        name: "[📁 filesystem   ] Trim trailing whitespace"
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+        name: "[📁 filesystem   ] Fix end of files"
+      - id: mixed-line-ending
+        name: "[📁 filesystem   ] Fix mixed line endings"
+        args: [--fix=lf]
+
+  # ============================================================================
+  # Core Programming Language Hooks - Python
+  # ============================================================================
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-ast
+        name: "[🐍 python       ] Check Python abstract syntax tree"
+      - id: debug-statements
+        name: "[🐍 python       ] Check for debug statements"
+
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.23
+    hooks:
+      - id: validate-pyproject
+        name: "[🐍 python       ] Validate pyproject.toml"
+        additional_dependencies: ["validate-pyproject-schema-store[all]"]
+
+  - repo: local
+    hooks:
+      - id: pants-fmt
+        name: "[🐍 python       ] Format with Ruff via Pants"
+        entry: "pants fmt ::"
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+      - id: pants-lint
+        name: "[🐍 python       ] Lint with Ruff via Pants"
+        entry: "pants lint ::"
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+      - id: pants-check
+        name: "[🐍 python       ] Type check with MyPy via Pants"
+        entry: "pants check ::"
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
+  # ============================================================================
+  # Core Programming Language Hooks - JavaScript
+  # ============================================================================
+
+  - repo: https://github.com/biomejs/pre-commit
+    rev: "v0.6.1"
+    hooks:
+      - id: biome-check
+        name: "[🟨 javascript   ] Lint and format with Biome"
+        additional_dependencies: ["@biomejs/biome@1.9.4"]
+        files: \.(js|jsx|ts|tsx|json)$
+
+  # ============================================================================
+  # Configuration and Markup File Hooks
+  # ============================================================================
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        name: "[⚙️  configuration] Check YAML syntax"
+      - id: check-json
+        name: "[⚙️  configuration] Check JSON syntax"
+      - id: check-toml
+        name: "[⚙️  configuration] Check TOML syntax"
+
+  - repo: https://github.com/hukkin/mdformat
+    rev: 0.7.21
+    hooks:
+      - id: mdformat
+        name: "[⚙️  configuration] Format markdown files"
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-frontmatter
+
+  # ============================================================================
+  # Security Hooks
+  # ============================================================================
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.22.1
+    hooks:
+      - id: gitleaks
+        name: "[🔒 security     ] Detect hardcoded secrets"
+
+  # ============================================================================
+  # Python Test Hooks
+  # ============================================================================
+
+  - repo: local
+    hooks:
+      - id: pants-test
+        name: "[🧪 test         ] Run tests via Pants"
+        entry: "pants test ::"
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+        always_run: true
