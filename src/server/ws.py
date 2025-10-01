@@ -8,7 +8,7 @@ from enum import Enum, auto
 
 from aiohttp import WSCloseCode, WSMessage, WSMsgType, web
 
-from server.models import ChatMessage
+from server.models import ChatMessage, json_dumps, json_loads
 from server.redis import RedisManager
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ class WSMessageRouter:
         data = message.data
 
         try:
-            obj = ChatMessage.from_json(data)
+            obj = json_loads(data)
         except ValueError:
             # Drop garbage input instead of crashing the room.
             logger.warning("Failed to parse message %s", data, exc_info=True)
@@ -108,7 +108,7 @@ class WSMessageRouter:
         await self.redis.publish_message(obj)
 
     async def _broadcast_to_local_peers(self, message: ChatMessage) -> None:
-        payload = message.to_json()
+        payload = json_dumps(message)
 
         # Snapshotting the clients set is necessary here, as during await a
         # client can disconnect, causing a mutation of the clients set, which

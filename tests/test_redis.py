@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from server.models import ChatMessage
+from server.models import ChatMessage, json_dumps
 from server.redis import RedisManager
 
 
@@ -99,7 +99,7 @@ class TestRedisManager:
         await redis_manager.publish_message(sample_message)
 
         mock_client.publish.assert_called_once_with(
-            RedisManager.CHANNEL, sample_message.to_json()
+            RedisManager.CHANNEL, json_dumps(sample_message)
         )
 
     async def test_publish_message_no_client(
@@ -139,7 +139,7 @@ class TestRedisManager:
         # Mock message iteration
         messages = [
             {"type": "subscribe", "data": None},
-            {"type": "message", "data": sample_message.to_json()},
+            {"type": "message", "data": json_dumps(sample_message)},
         ]
         mock_pubsub.listen.return_value.__aiter__ = lambda self: iter(messages)
 

@@ -7,7 +7,7 @@ from aiohttp import web
 from aiohttp.client_ws import ClientWebSocketResponse
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
-from server.models import ChatMessage
+from server.models import ChatMessage, json_dumps
 from server.ws import WSMessageRouter
 
 MessageHandler = Callable[[ChatMessage], Awaitable[None]]
@@ -78,7 +78,7 @@ class TestWebSocketE2E(AioHTTPTestCase):
         )
 
         # Client 1 sends a message
-        await session1.send_str(test_message.to_json())
+        await session1.send_str(json_dumps(test_message))
 
         # Both clients should receive the message (fan-out behavior)
         # Give some time for the message to propagate
@@ -125,15 +125,15 @@ class TestWebSocketE2E(AioHTTPTestCase):
         ]
 
         # Client 1 sends first message
-        await session1.send_str(messages[0].to_json())
+        await session1.send_str(json_dumps(messages[0]))
         await asyncio.sleep(0.1)
 
         # Client 2 sends second message
-        await session2.send_str(messages[1].to_json())
+        await session2.send_str(json_dumps(messages[1]))
         await asyncio.sleep(0.1)
 
         # Client 1 sends third message
-        await session1.send_str(messages[2].to_json())
+        await session1.send_str(json_dumps(messages[2]))
         await asyncio.sleep(0.1)
 
         # Verify all messages were published to Redis
@@ -189,7 +189,7 @@ class TestWebSocketE2E(AioHTTPTestCase):
 
         # Send valid message to verify connection is still working
         valid_message = ChatMessage(text="Valid message", type="message", ts=1004)
-        await session.send_str(valid_message.to_json())
+        await session.send_str(json_dumps(valid_message))
         await asyncio.sleep(0.1)
 
         # This should work

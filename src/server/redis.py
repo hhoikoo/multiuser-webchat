@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable
 import redis.asyncio as redis
 from aiohttp import web
 
-from server.models import ChatMessage
+from server.models import ChatMessage, json_dumps, json_loads
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +49,10 @@ class RedisManager:
         self._message_handler = handler
 
     async def publish_message(self, message: ChatMessage) -> None:
-        if not self.client:
+        if self.client is None:
             raise RuntimeError("Redis client not connected!")
 
-        payload = message.to_json()
+        payload = json_dumps(message)
         await self.client.publish(self.CHANNEL, payload)  # pyright: ignore[reportUnknownMemberType]
 
     async def start_listen(self) -> None:
@@ -71,7 +71,7 @@ class RedisManager:
                 async for message in pubsub.listen():  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
                     if message["type"] == "message":
                         try:
-                            data = ChatMessage.from_json(message["data"])  # pyright: ignore[reportUnknownArgumentType]
+                            data = json_loads(message["data"])  # pyright: ignore[reportUnknownArgumentType]
                             if self._message_handler:
                                 await self._message_handler(data)
                         except ValueError:

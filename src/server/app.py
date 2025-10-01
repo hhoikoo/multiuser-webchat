@@ -40,7 +40,7 @@ async def on_cleanup(app: web.Application) -> None:
 
 
 async def healthz(_: web.Request) -> web.Response:
-    return web.json_response({"ok": True})
+    return web.json_response({"status": "ok"})
 
 
 async def index(_: web.Request) -> web.FileResponse:
