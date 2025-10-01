@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from server.models import ChatMessage
+from server.models import ChatMessage, json_dumps
 from server.redis import RedisManager
 
 
@@ -98,8 +98,11 @@ class TestRedisManager:
 
         await redis_manager.publish_message(sample_message)
 
-        mock_client.publish.assert_called_once_with(
-            RedisManager.CHANNEL, sample_message.to_json()
+        mock_client.xadd.assert_called_once_with(
+            name=RedisManager.STREAM_KEY,
+            fields={"data": json_dumps(sample_message)},
+            maxlen=RedisManager.MAX_STREAM_LENGTH,
+            approximate=True,
         )
 
     async def test_publish_message_no_client(
@@ -131,24 +134,21 @@ class TestRedisManager:
         redis_manager.client = mock_client
         redis_manager._message_handler = mock_handler
 
-        # Mock pubsub context manager
-        mock_pubsub = AsyncMock()
-        mock_client.pubsub.return_value.__aenter__.return_value = mock_pubsub
-        mock_client.pubsub.return_value.__aexit__.return_value = None
-
-        # Mock message iteration
-        messages = [
-            {"type": "subscribe", "data": None},
-            {"type": "message", "data": sample_message.to_json()},
+        # Mock XREAD response
+        message_id = "1234567890-0"
+        mock_client.xread.return_value = [
+            [
+                RedisManager.STREAM_KEY,
+                [(message_id, {"data": json_dumps(sample_message)})],
+            ]
         ]
-        mock_pubsub.listen.return_value.__aiter__ = lambda self: iter(messages)
 
         # Run listen loop once and cancel
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(redis_manager._listen_loop(), timeout=0.1)
 
-        mock_pubsub.subscribe.assert_called_once_with(RedisManager.CHANNEL)
-        mock_handler.assert_called_once_with(sample_message)
+        mock_client.xread.assert_called()
+        mock_handler.assert_called_with(sample_message)
 
     async def test_listen_loop_invalid_message(
         self, redis_manager: RedisManager
@@ -193,4 +193,4 @@ class TestRedisManager:
             await redis_manager._listen_loop()
 
     def test_channel_constant(self) -> None:
-        assert RedisManager.CHANNEL == "chat:messages"
+        assert RedisManager.STREAM_KEY == "chat:messages"

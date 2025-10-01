@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import Awaitable, Callable
+import time
+from collections.abc import Awaitable, Callable, Generator
+from typing import Any
 
 import redis.asyncio as redis
 from aiohttp import web
 
-from server.models import ChatMessage
+from server.models import ChatMessage, json_dumps, json_loads
 
 logger = logging.getLogger(__name__)
 
@@ -16,14 +18,20 @@ logger = logging.getLogger(__name__)
 MessageHandler = Callable[[ChatMessage], Awaitable[None]]
 
 
+SECONDS_IN_MINUTE = 60
+MS_IN_SECOND = 1_000
+
+
 class RedisManager:
-    CHANNEL = "chat:messages"
+    STREAM_KEY = "chat:messages"
+    MAX_STREAM_LENGTH = 10_000
 
     def __init__(self, redis_url: str) -> None:
         self.redis_url = redis_url
         self.client: redis.Redis | None = None
         self._listener_task: asyncio.Task[None] | None = None
         self._message_handler: MessageHandler | None = None
+        self._last_id: str = "$"  # Start reading from new messages
 
     async def connect(self) -> None:
         if self.client:
@@ -48,12 +56,38 @@ class RedisManager:
     def set_message_handler(self, handler: MessageHandler) -> None:
         self._message_handler = handler
 
-    async def publish_message(self, message: ChatMessage) -> None:
-        if not self.client:
+    async def fetch_history(self, minutes: int = 30) -> list[ChatMessage]:
+        if self.client is None:
             raise RuntimeError("Redis client not connected!")
 
-        payload = message.to_json()
-        await self.client.publish(self.CHANNEL, payload)  # pyright: ignore[reportUnknownMemberType]
+        current_time_ms = int(time.time() * MS_IN_SECOND)
+        start_time_ms = current_time_ms - (minutes * SECONDS_IN_MINUTE * MS_IN_SECOND)
+
+        # XRANGE with timestamp-based IDs: format is "timestamp-sequence"
+        # Using start_time_ms-0 to get all messages from that timestamp onward
+        response = await self.client.xrange(
+            name=self.STREAM_KEY,
+            min=f"{start_time_ms}-0",
+            max="+",  # Current time
+        )
+
+        messages = [
+            message for _, message in self.extract_messages_from_response(response)
+        ]
+
+        return messages
+
+    async def publish_message(self, message: ChatMessage) -> None:
+        if self.client is None:
+            raise RuntimeError("Redis client not connected!")
+
+        payload = json_dumps(message)
+        await self.client.xadd(
+            name=self.STREAM_KEY,
+            fields={"data": payload},
+            maxlen=self.MAX_STREAM_LENGTH,
+            approximate=True,  # More efficient auto-trimming
+        )
 
     async def start_listen(self) -> None:
         if not self.client:
@@ -65,42 +99,55 @@ class RedisManager:
         assert self.client
 
         try:
-            async with self.client.pubsub() as pubsub:  # pyright: ignore[reportUnknownMemberType]
-                await pubsub.subscribe(self.CHANNEL)  # pyright: ignore[reportUnknownMemberType]
+            while True:
+                stream_data = await self.client.xread(
+                    streams={self.STREAM_KEY: self._last_id},
+                    count=100,
+                    block=5 * MS_IN_SECOND,
+                )
 
-                async for message in pubsub.listen():  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-                    if message["type"] == "message":
-                        try:
-                            data = ChatMessage.from_json(message["data"])  # pyright: ignore[reportUnknownArgumentType]
-                            if self._message_handler:
-                                await self._message_handler(data)
-                        except ValueError:
-                            logger.exception(
-                                "Failed to parse message with data %s!",
-                                message["data"],  # pyright: ignore[reportUnknownArgumentType]
-                            )
-                        except Exception:
-                            logger.exception(
-                                "Unknown exception occured while receiving message %s.",
-                                message,  # pyright: ignore[reportUnknownArgumentType]
-                            )
-                    elif message["type"] == "subscribe":
-                        logger.debug(
-                            "Subscribe message received. message=%s",
-                            message,  # pyright: ignore[reportUnknownArgumentType]
-                        )
-                    else:
-                        logger.warning(
-                            "Unknown message type %s! message=%s",
-                            message["type"],  # pyright: ignore[reportUnknownArgumentType]
-                            message,  # pyright: ignore[reportUnknownArgumentType]
-                        )
+                if not stream_data:
+                    # Timeout, no new messages in last 5 seconds
+                    continue
+
+                for _, response in stream_data:
+                    messages = self.extract_messages_from_response(response)
+                    for message_id, message in messages:
+                        self._last_id = message_id
+                        if self._message_handler:
+                            await self._message_handler(message)
         except asyncio.CancelledError as exc:
             logger.info("Client listener is cancelled.")
             raise exc
         except Exception:
             logger.exception("Unknown exception occured during listening loop.")
             return
+
+    def extract_messages_from_response(
+        self, response: list[tuple[str, dict[str, Any]]]
+    ) -> Generator[tuple[str, ChatMessage]]:
+        for message_id, fields in response:
+            payload = fields.get("data")
+            if not payload:
+                logger.warning("Message %s has no 'data' field!", message_id)
+                continue
+
+            try:
+                chat_message = json_loads(payload)
+                yield message_id, chat_message
+            except ValueError:
+                logger.exception(
+                    "Failed to parse message with id %s and payload %s!",
+                    message_id,
+                    payload,
+                    exc_info=True,
+                )
+            except Exception:
+                logger.warning(
+                    "Unknown exception occured while receiving message %s",
+                    message_id,
+                    exc_info=True,
+                )
 
 
 def install_redis_manager(app: web.Application, redis_url: str) -> RedisManager:

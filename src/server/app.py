@@ -9,6 +9,7 @@ from types import FrameType
 
 from aiohttp import web
 
+from server.models import json_dumps
 from server.redis import RedisManager, install_redis_manager
 from server.ws import WSMessageRouter, install_ws_router
 
@@ -16,15 +17,17 @@ logger = logging.getLogger(__name__)
 
 
 STATIC_RESOURCES_DIR = Path(__file__).resolve().parent.parent / "static"
+MINUTES_IN_HOUR = 60
+HOUR_IN_DAY = 24
 
 
 async def on_startup(app: web.Application) -> None:
     redis_manager: RedisManager = app["redis_manager"]
     logger.info("Connecting to Redis...")
     await redis_manager.connect()
-    logger.info("Redis connected! Establishing pubsub connection...")
+    logger.info("Redis connected! Starting stream listener...")
     await redis_manager.start_listen()
-    logger.info("The server is now ready to listen to Redis messages!")
+    logger.info("The server is now ready to listen to Redis stream messages!")
 
 
 async def on_cleanup(app: web.Application) -> None:
@@ -40,11 +43,30 @@ async def on_cleanup(app: web.Application) -> None:
 
 
 async def healthz(_: web.Request) -> web.Response:
-    return web.json_response({"ok": True})
+    return web.json_response({"status": "ok"})
 
 
 async def index(_: web.Request) -> web.FileResponse:
     return web.FileResponse(STATIC_RESOURCES_DIR / "index.html")
+
+
+async def get_messages(req: web.Request) -> web.Response:
+    minutes_str = req.query.get("minutes", "30")
+    if not minutes_str.isdigit():
+        raise web.HTTPBadRequest(reason="minutes is not a valid integer!")
+    minutes = int(minutes_str)
+    if minutes < 1:
+        raise web.HTTPBadRequest(reason="minutes must be a positive number!")
+    if minutes > MINUTES_IN_HOUR * HOUR_IN_DAY:
+        raise web.HTTPBadRequest(reason="minutes cannot be more than 24 hours!")
+
+    redis_manager: RedisManager = req.app["redis_manager"]
+    try:
+        messages = await redis_manager.fetch_history(minutes=minutes)
+        return web.json_response({"messages": messages}, dumps=json_dumps)
+    except Exception as exc:
+        logger.exception("Failed to fetch message history")
+        return web.json_response({"error": str(exc)}, status=500)
 
 
 def create_app(redis_url: str) -> web.Application:
@@ -53,6 +75,7 @@ def create_app(redis_url: str) -> web.Application:
         [
             web.get("/", index),
             web.get("/healthz", healthz),
+            web.get("/messages", get_messages),
             web.static("/static", STATIC_RESOURCES_DIR),
         ]
     )

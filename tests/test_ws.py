@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp import WSCloseCode, WSMessage, WSMsgType
 
-from server.models import ChatMessage
+from server.models import ChatMessage, json_dumps
 from server.ws import SEND_TIMEOUT, WS_CLOSE_TIMEOUT, PeerStatus, WSMessageRouter
 
 # Test constants
@@ -148,7 +148,7 @@ class TestWSMessageRouter:
         self, ws_router: WSMessageRouter, sample_message: ChatMessage
     ) -> None:
         message = WSMessage(
-            type=WSMsgType.TEXT, data=sample_message.to_json(), extra=None
+            type=WSMsgType.TEXT, data=json_dumps(sample_message), extra=None
         )
 
         await ws_router._handle_text(message)

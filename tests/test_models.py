@@ -3,7 +3,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from server.models import ChatMessage
+from server.models import ChatMessage, json_dumps, json_loads
 
 # Test constants
 SAMPLE_TIMESTAMP_1 = 1234567890
@@ -23,7 +23,7 @@ class TestChatMessage:
         message = ChatMessage(
             text="Test message", type="broadcast", ts=SAMPLE_TIMESTAMP_2
         )
-        json_str = message.to_json()
+        json_str = json_dumps(message)
 
         parsed = json.loads(json_str)
         assert parsed["text"] == "Test message"
@@ -34,30 +34,29 @@ class TestChatMessage:
         json_str = (
             f'{{"text": "From JSON", "type": "alert", "ts": {SAMPLE_TIMESTAMP_3}}}'
         )
-        message = ChatMessage.from_json(json_str)
+        message = json_loads(json_str)
 
         assert message.text == "From JSON"
         assert message.type == "alert"
         assert message.ts == SAMPLE_TIMESTAMP_3
 
     def test_from_json_invalid_json(self) -> None:
-        with pytest.raises(ValueError):
-            ChatMessage.from_json("invalid json")
+        with pytest.raises(json.JSONDecodeError):
+            json_loads("invalid json")
 
     def test_from_json_missing_fields(self) -> None:
-        with pytest.raises(ValueError):
-            ChatMessage.from_json('{"text": "Missing fields"}')
+        obj = json_loads('{"text": "Missing fields"}')
+        assert not isinstance(obj, ChatMessage)
 
-    def test_from_json_extra_fields_ignored(self) -> None:
-        # ChatMessage accepts any types, but extra fields should be ignored
+    def test_from_json_extra_fields_throw_error(self) -> None:
         json_str = '{"text": "Test", "type": "message", "ts": 123, "extra": "ignored"}'
-        with pytest.raises(ValueError):  # TypeError gets wrapped as ValueError
-            ChatMessage.from_json(json_str)
+        with pytest.raises(TypeError):
+            json_loads(json_str)
 
     def test_round_trip_serialization(self) -> None:
         original = ChatMessage(text="Round trip test", type="system", ts=5555555555)
-        json_str = original.to_json()
-        restored = ChatMessage.from_json(json_str)
+        json_str = json_dumps(original)
+        restored = json_loads(json_str)
 
         assert original == restored
 
@@ -78,8 +77,8 @@ class TestChatMessage:
 
     def test_empty_text(self) -> None:
         message = ChatMessage(text="", type="empty", ts=0)
-        json_str = message.to_json()
-        restored = ChatMessage.from_json(json_str)
+        json_str = json_dumps(message)
+        restored = json_loads(json_str)
 
         assert restored.text == ""
         assert restored.type == "empty"
@@ -89,8 +88,8 @@ class TestChatMessage:
         unicode_text = "Hello 🌍 世界 emoji test! 🚀"
         message = ChatMessage(text=unicode_text, type="unicode", ts=777)
 
-        json_str = message.to_json()
-        restored = ChatMessage.from_json(json_str)
+        json_str = json_dumps(message)
+        restored = json_loads(json_str)
 
         assert restored.text == unicode_text
         assert restored == message

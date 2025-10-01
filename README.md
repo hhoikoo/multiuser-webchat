@@ -110,10 +110,10 @@ For development without Docker:
 
    ```bash
    # Install Python 3.13 with pyenv
-   pyenv install 3.13.0
+   pyenv install 3.13
 
    # Set local Python version for this project
-   pyenv local 3.13.0
+   pyenv local 3.13
 
    # Verify Python version
    python --version

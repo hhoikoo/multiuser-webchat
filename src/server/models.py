@@ -1,6 +1,7 @@
 import json
 import logging
 from dataclasses import asdict, dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -11,17 +12,23 @@ class ChatMessage:
     type: str
     ts: int
 
-    @staticmethod
-    def from_json(obj_str: str) -> "ChatMessage":
-        try:
-            obj_json = json.loads(obj_str)
-            return ChatMessage(**obj_json)
-        except json.JSONDecodeError as exc:
-            logger.error("Invalid JSON string %s!", obj_str)
-            raise ValueError from exc
-        except TypeError as exc:
-            logger.error("Failed to convert %s to a ChatMessage!", obj_str)
-            raise ValueError from exc
 
-    def to_json(self) -> str:
-        return json.dumps(asdict(self))
+class ChatMessageEncoder(json.JSONEncoder):
+    def default(self, o: Any) -> Any:
+        if isinstance(o, ChatMessage):
+            return asdict(o)
+        return super().default(o)
+
+
+def chat_message_decoder(obj: dict[str, Any]) -> ChatMessage | dict[str, Any]:
+    if {"text", "type", "ts"}.issubset(obj.keys()):
+        return ChatMessage(**obj)
+    return obj
+
+
+def json_dumps(obj: Any) -> str:
+    return json.dumps(obj, cls=ChatMessageEncoder)
+
+
+def json_loads(s: str) -> Any:
+    return json.loads(s, object_hook=chat_message_decoder)
