@@ -10,6 +10,31 @@ const appendMessage = (text) => {
 	messages.prepend(div);
 };
 
+const loadHistory = async () => {
+	try {
+		const response = await fetch("/messages?minutes=30");
+		if (!response.ok) {
+			console.error("Failed to fetch history:", response.statusText);
+			return;
+		}
+
+		const data = await response.json();
+		const messagesHistory = data?.messages ?? [];
+
+		for (const msg of messagesHistory) {
+			appendMessage(msg.text);
+		}
+
+		if (messagesHistory.length > 0) {
+			appendMessage(
+				`[loaded ${messagesHistory.length} message(s) from history]`,
+			);
+		}
+	} catch (error) {
+		console.error("Error loading history:", error);
+	}
+};
+
 class WebSocketManager {
 	static MAX_RECONNECT_ATTEMPTS = 5;
 	static BASE_RECONNECT_DELAY = 1000; // 1 second
@@ -21,6 +46,7 @@ class WebSocketManager {
 		this.reconnectAttempts = 0;
 		this.reconnectTimer = null;
 		this.isManualClose = false;
+		this.hasLoadedHistory = false;
 
 		this.connect();
 	}
@@ -36,9 +62,15 @@ class WebSocketManager {
 	}
 
 	setupEventListeners() {
-		this.ws.addEventListener("open", () => {
+		this.ws.addEventListener("open", async () => {
 			appendMessage("[connected]");
 			this.reconnectAttempts = 0; // Reset attempts on successful connection
+
+			// Load message history only on first connection
+			if (!this.hasLoadedHistory) {
+				await loadHistory();
+				this.hasLoadedHistory = true;
+			}
 		});
 
 		this.ws.addEventListener("close", () => {
