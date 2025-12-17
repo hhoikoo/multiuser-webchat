@@ -9,6 +9,7 @@ from types import FrameType
 
 from aiohttp import web
 
+from server.metrics import get_metrics_output
 from server.models import json_dumps
 from server.redis import RedisManager, install_redis_manager
 from server.ws import WSMessageRouter, install_ws_router
@@ -46,6 +47,15 @@ async def healthz(_: web.Request) -> web.Response:
     return web.json_response({"status": "ok"})
 
 
+async def metrics(_: web.Request) -> web.Response:
+    metrics_output = get_metrics_output()
+    return web.Response(
+        body=metrics_output,
+        content_type="text/plain; version=0.0.4",
+        charset="utf-8",
+    )
+
+
 async def index(_: web.Request) -> web.FileResponse:
     return web.FileResponse(STATIC_RESOURCES_DIR / "index.html")
 
@@ -75,6 +85,7 @@ def create_app(redis_url: str) -> web.Application:
         [
             web.get("/", index),
             web.get("/healthz", healthz),
+            web.get("/metrics", metrics),
             web.get("/messages", get_messages),
             web.static("/static", STATIC_RESOURCES_DIR),
         ]

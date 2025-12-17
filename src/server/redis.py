@@ -10,6 +10,7 @@ from typing import Any
 import redis.asyncio as redis
 from aiohttp import web
 
+from server.metrics import ERRORS_TOTAL, track_redis_operation
 from server.models import ChatMessage, json_dumps, json_loads
 
 logger = logging.getLogger(__name__)
@@ -38,11 +39,12 @@ class RedisManager:
             # TODO: Change to a warning and just return instead?
             raise RuntimeError("Attempting to connnect to Redis client twice!")
 
-        self.client = redis.Redis.from_url(  # pyright: ignore[reportUnknownMemberType]
-            url=self.redis_url,
-            encoding="utf-8",
-            decode_responses=True,
-        )
+        with track_redis_operation("connect"):
+            self.client = redis.Redis.from_url(  # pyright: ignore[reportUnknownMemberType]
+                url=self.redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+            )
 
     async def disconnect(self) -> None:
         if self._listener_task and not self._listener_task.done():
@@ -51,7 +53,8 @@ class RedisManager:
                 await self._listener_task
 
         if self.client:
-            await self.client.aclose()
+            with track_redis_operation("disconnect"):
+                await self.client.aclose()
 
     def set_message_handler(self, handler: MessageHandler) -> None:
         self._message_handler = handler
@@ -65,11 +68,12 @@ class RedisManager:
 
         # XRANGE with timestamp-based IDs: format is "timestamp-sequence"
         # Using start_time_ms-0 to get all messages from that timestamp onward
-        response = await self.client.xrange(
-            name=self.STREAM_KEY,
-            min=f"{start_time_ms}-0",
-            max="+",  # Current time
-        )
+        with track_redis_operation("xrange"):
+            response = await self.client.xrange(
+                name=self.STREAM_KEY,
+                min=f"{start_time_ms}-0",
+                max="+",  # Current time
+            )
 
         messages = [
             message for _, message in self.extract_messages_from_response(response)
@@ -82,12 +86,13 @@ class RedisManager:
             raise RuntimeError("Redis client not connected!")
 
         payload = json_dumps(message)
-        await self.client.xadd(
-            name=self.STREAM_KEY,
-            fields={"data": payload},
-            maxlen=self.MAX_STREAM_LENGTH,
-            approximate=True,  # More efficient auto-trimming
-        )
+        with track_redis_operation("xadd"):
+            await self.client.xadd(
+                name=self.STREAM_KEY,
+                fields={"data": payload},
+                maxlen=self.MAX_STREAM_LENGTH,
+                approximate=True,  # More efficient auto-trimming
+            )
 
     async def start_listen(self) -> None:
         if not self.client:
@@ -100,11 +105,16 @@ class RedisManager:
 
         try:
             while True:
-                stream_data = await self.client.xread(
-                    streams={self.STREAM_KEY: self._last_id},
-                    count=100,
-                    block=5 * MS_IN_SECOND,
-                )
+                try:
+                    with track_redis_operation("xread"):
+                        stream_data = await self.client.xread(
+                            streams={self.STREAM_KEY: self._last_id},
+                            count=100,
+                            block=5 * MS_IN_SECOND,
+                        )
+                except Exception as e:
+                    ERRORS_TOTAL.labels(type="redis_error").inc()
+                    raise e
 
                 if not stream_data:
                     # Timeout, no new messages in last 5 seconds
@@ -120,6 +130,7 @@ class RedisManager:
             logger.info("Client listener is cancelled.")
             raise exc
         except Exception:
+            ERRORS_TOTAL.labels(type="redis_error").inc()
             logger.exception("Unknown exception occured during listening loop.")
             return
 

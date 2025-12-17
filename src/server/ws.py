@@ -8,6 +8,13 @@ from enum import Enum, auto
 
 from aiohttp import WSCloseCode, WSMessage, WSMsgType, web
 
+from server.metrics import (
+    CONNECTED_USERS,
+    CONNECTIONS_TOTAL,
+    DISCONNECTIONS_TOTAL,
+    ERRORS_TOTAL,
+    track_message_processing,
+)
 from server.models import ChatMessage, json_dumps, json_loads
 from server.redis import RedisManager
 
@@ -23,6 +30,10 @@ class PeerStatus(Enum):
 
 WS_CLOSE_TIMEOUT = 2.0
 SEND_TIMEOUT = 0.25
+
+# WebSocket close codes
+WS_CLOSE_NORMAL = 1000
+WS_CLOSE_GOING_AWAY = 1001
 
 
 class WSMessageRouter:
@@ -40,6 +51,7 @@ class WSMessageRouter:
                         logger.info("Received message %s of type TEXT.", message)
                         await self._handle_text(message)
                     case WSMsgType.ERROR:
+                        ERRORS_TOTAL.labels(type="websocket_error").inc()
                         logger.error("Received an Error message %s!", message)
                         break
                     case _ as type:
@@ -56,14 +68,46 @@ class WSMessageRouter:
     ) -> AsyncGenerator[web.WebSocketResponse]:
         ws = web.WebSocketResponse(heartbeat=25)  # keep-alive
         logger.info("Connecting to WebSocket at address %s...", req.url)
-        await ws.prepare(req)
-        logger.info("Connection established to %s!", req.url)
-        self.clients.add(ws)
 
         try:
+            await ws.prepare(req)
+        except Exception:
+            CONNECTIONS_TOTAL.labels(status="upgrade_failed").inc()
+            raise
+
+        logger.info("Connection established to %s!", req.url)
+        CONNECTIONS_TOTAL.labels(status="success").inc()
+        CONNECTED_USERS.inc()
+        self.clients.add(ws)
+
+        disconnect_reason = "normal"
+        try:
             yield ws
+        except TimeoutError:
+            disconnect_reason = "timeout"
+            raise
+        except Exception:
+            disconnect_reason = "error"
+            raise
         finally:
             self.clients.discard(ws)
+            CONNECTED_USERS.dec()
+
+            if ws.close_code == WSCloseCode.GOING_AWAY:
+                disconnect_reason = "going_away"
+            elif (
+                ws.close_code
+                and ws.close_code >= WS_CLOSE_NORMAL
+                and disconnect_reason == "normal"
+            ):
+                disconnect_reason = (
+                    "server_shutdown"
+                    if ws.close_code == WS_CLOSE_GOING_AWAY
+                    else "normal"
+                )
+
+            DISCONNECTIONS_TOTAL.labels(reason=disconnect_reason).inc()
+
             logger.info("Disconnecting from WebSocket...")
             await ws.close()
             logger.info("Successfully disconnected.")
@@ -98,14 +142,16 @@ class WSMessageRouter:
         try:
             obj = json_loads(data)
         except ValueError:
-            # Drop garbage input instead of crashing the room.
+            ERRORS_TOTAL.labels(type="parse_error").inc()
             logger.warning("Failed to parse message %s", data, exc_info=True)
             return
         except Exception:
+            ERRORS_TOTAL.labels(type="parse_error").inc()
             logger.exception("Unexpected error while parsing message %s")
             return
 
-        await self.redis.publish_message(obj)
+        with track_message_processing():
+            await self.redis.publish_message(obj)
 
     async def _broadcast_to_local_peers(self, message: ChatMessage) -> None:
         payload = json_dumps(message)
