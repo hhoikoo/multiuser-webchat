@@ -45,9 +45,13 @@ RUN ls -lh dist/src.server
 
 FROM python:3.13-slim
 
-# Create non-root user for security
-RUN groupadd -r appuser && \
-    useradd -r -g appuser -d /app -s /bin/bash appuser
+# Create non-root user for security with explicit UID/GID for tmpfs permissions
+RUN groupadd -g 1000 appuser && \
+    useradd -u 1000 -g appuser -d /app -s /bin/bash appuser
+
+# Create prometheus multiprocess directory
+RUN mkdir -p /tmp/prometheus_multiproc && \
+    chown -R appuser:appuser /tmp/prometheus_multiproc
 
 # Set working directory
 WORKDIR /app
@@ -71,7 +75,8 @@ EXPOSE 8080
 ENV PORT=8080 \
     HOST=0.0.0.0 \
     WORKERS=1 \
-    REDIS_URL=redis://redis:6379
+    REDIS_URL=redis://redis:6379 \
+    PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
