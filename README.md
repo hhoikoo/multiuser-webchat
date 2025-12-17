@@ -15,12 +15,13 @@ A real-time multi-user webchat application built with Python (aiohttp), Redis, a
 - **Load balancing**: Nginx reverse proxy with support for multiple backend instances
 - **Containerized deployment**: Full Docker Compose setup for easy deployment
 - **Health checks**: Built-in health monitoring for all services
+- **Observability**: Prometheus metrics with Grafana dashboards for monitoring
 
 ## Technology Stack
 
 - **Backend**: Python 3.13, aiohttp, Redis
 - **Frontend**: Vanilla JavaScript, HTML5, CSS3
-- **Infrastructure**: Docker, Nginx, Redis
+- **Infrastructure**: Docker, Nginx, Redis, Prometheus, Grafana
 - **Build System**: Pants build system
 - **Code Quality**: Ruff (linting/formatting), MyPy (type checking)
 
@@ -43,6 +44,11 @@ A real-time multi-user webchat application built with Python (aiohttp), Redis, a
                    │   Static    │
                    │    Files    │
                    └─────────────┘
+
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Grafana   │◄───│ Prometheus  │◄───│  Chat App   │
+│  :3001      │    │  :9091      │    │  /metrics   │
+└─────────────┘    └─────────────┘    └─────────────┘
 ```
 
 ## Prerequisites
@@ -153,13 +159,14 @@ For development without Docker:
 
 You can customize the application behavior using environment variables:
 
-| Variable       | Default                  | Description                                               |
-| -------------- | ------------------------ | --------------------------------------------------------- |
-| `HOST`         | `0.0.0.0`                | Server bind address                                       |
-| `PORT`         | `8080`                   | Server port                                               |
-| `WORKERS`      | `1`                      | Number of worker processes                                |
-| `REDIS_URL`    | `redis://localhost:6379` | Redis connection URL                                      |
-| `WEB_REPLICAS` | `4`                      | (Only in `docker-compose`) Number of web service replicas |
+| Variable                   | Default                     | Description                                               |
+| -------------------------- | --------------------------- | --------------------------------------------------------- |
+| `HOST`                     | `0.0.0.0`                   | Server bind address                                       |
+| `PORT`                     | `8080`                      | Server port                                               |
+| `WORKERS`                  | `1`                         | Number of worker processes                                |
+| `REDIS_URL`                | `redis://localhost:6379`    | Redis connection URL                                      |
+| `WEB_REPLICAS`             | `4`                         | (Only in `docker-compose`) Number of web service replicas |
+| `PROMETHEUS_MULTIPROC_DIR` | `/tmp/prometheus_multiproc` | Directory for Prometheus multiprocess metrics             |
 
 Example:
 
@@ -240,11 +247,15 @@ multiuser-webchat/
 │   ├── app.py           # Main application entry point
 │   ├── ws.py            # WebSocket handling
 │   ├── models.py        # Data models
-│   └── redis.py         # Redis connection management
+│   ├── redis.py         # Redis connection management
+│   └── metrics.py       # Prometheus metrics definitions
 ├── frontend/static/      # Frontend assets
 │   ├── index.html       # Main HTML page
 │   ├── app.js          # WebSocket client with auto-reconnection
 │   └── style.css       # Styles
+├── monitoring/           # Observability configuration
+│   ├── prometheus/      # Prometheus config
+│   └── grafana/         # Grafana dashboards and datasources
 ├── tests/               # Test suite
 ├── docker-compose.yml   # Multi-service Docker setup
 ├── Dockerfile          # Application container definition
@@ -314,6 +325,8 @@ docker build -t chat-app:latest .
 1. **Monitoring**:
 
    - Application exposes health check endpoints at `/healthz`
+   - Prometheus metrics available at `/metrics`
+   - Grafana dashboards for real-time monitoring
    - Monitor Docker container health status
    - Set up logging aggregation for distributed logs
 
@@ -331,6 +344,38 @@ docker compose logs -f
 # Monitor health
 docker compose ps
 ```
+
+## Monitoring
+
+The application includes built-in observability with Prometheus metrics and Grafana dashboards.
+
+### Accessing Dashboards
+
+- **Grafana**: `http://localhost:3001` (anonymous access enabled)
+- **Prometheus**: `http://localhost:9091`
+
+### Available Metrics
+
+The application exposes the following metrics at `/metrics`:
+
+| Metric                            | Type      | Description                                     |
+| --------------------------------- | --------- | ----------------------------------------------- |
+| `webchat_connected_users`         | Gauge     | Number of currently connected WebSocket users   |
+| `webchat_messages_total`          | Counter   | Total number of messages processed              |
+| `webchat_message_latency_seconds` | Histogram | Time to process a message                       |
+| `webchat_connections_total`       | Counter   | Total WebSocket connection attempts (by status) |
+| `webchat_disconnections_total`    | Counter   | Total WebSocket disconnections (by reason)      |
+| `webchat_redis_operations_total`  | Counter   | Total Redis operations (by operation/status)    |
+| `webchat_redis_latency_seconds`   | Histogram | Redis operation latency                         |
+| `webchat_errors_total`            | Counter   | Total errors (by type)                          |
+
+### Docker Service Discovery
+
+Prometheus uses Docker service discovery to automatically find and scrape all web container replicas. This means:
+
+- No manual configuration needed when scaling workers
+- Metrics are collected directly from each container (not through nginx)
+- Use `sum(webchat_connected_users)` in PromQL to get total connected users across all replicas
 
 ## Troubleshooting
 
