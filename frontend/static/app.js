@@ -21,7 +21,7 @@ const loadHistory = async () => {
 		const data = await response.json();
 		const messagesHistory = data?.messages ?? [];
 
-		for (const msg of messagesHistory) {
+		for (const msg of messagesHistory.reverse()) {
 			appendMessage(msg.text);
 		}
 

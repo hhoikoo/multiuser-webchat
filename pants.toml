@@ -22,4 +22,3 @@ config = "ruff.toml"
 config = "mypy.ini"
 
 [pytest]
-# (we'll add tests later)

@@ -49,7 +49,7 @@ class TestRedisManager:
         redis_manager.client = AsyncMock()  # Simulate already connected
 
         with pytest.raises(
-            RuntimeError, match="Attempting to connnect to Redis client twice!"
+            RuntimeError, match="Attempting to connect to Redis client twice!"
         ):
             await redis_manager.connect()
 
@@ -156,16 +156,14 @@ class TestRedisManager:
         mock_client = AsyncMock()
         redis_manager.client = mock_client
 
-        # Mock pubsub context manager
-        mock_pubsub = AsyncMock()
-        mock_client.pubsub.return_value.__aenter__.return_value = mock_pubsub
-        mock_client.pubsub.return_value.__aexit__.return_value = None
-
-        # Mock invalid message
-        messages = [
-            {"type": "message", "data": "invalid json"},
+        # Mock XREAD response with invalid JSON
+        message_id = "1234567890-0"
+        mock_client.xread.return_value = [
+            [
+                RedisManager.STREAM_KEY,
+                [(message_id, {"data": "invalid json"})],
+            ]
         ]
-        mock_pubsub.listen.return_value.__aiter__ = lambda self: iter(messages)
 
         # Should not crash on invalid message
         with contextlib.suppress(TimeoutError):
@@ -177,17 +175,8 @@ class TestRedisManager:
         mock_client = AsyncMock()
         redis_manager.client = mock_client
 
-        # Mock pubsub that gets cancelled
-        mock_pubsub = AsyncMock()
-        mock_client.pubsub.return_value.__aenter__.return_value = mock_pubsub
-        mock_client.pubsub.return_value.__aexit__.return_value = None
-
-        # Mock listen that raises CancelledError
-        async def mock_listen() -> AsyncMock:  # type: ignore[misc]
-            yield {"type": "subscribe", "data": None}
-            raise asyncio.CancelledError()
-
-        mock_pubsub.listen.return_value = mock_listen()
+        # Mock xread that raises CancelledError
+        mock_client.xread.side_effect = asyncio.CancelledError()
 
         with pytest.raises(asyncio.CancelledError):
             await redis_manager._listen_loop()

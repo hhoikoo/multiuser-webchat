@@ -30,6 +30,7 @@ class PeerStatus(Enum):
 
 WS_CLOSE_TIMEOUT = 2.0
 SEND_TIMEOUT = 0.25
+WS_HEARTBEAT_INTERVAL = 25
 
 # WebSocket close codes
 WS_CLOSE_NORMAL = 1000
@@ -54,10 +55,10 @@ class WSMessageRouter:
                         ERRORS_TOTAL.labels(type="websocket_error").inc()
                         logger.error("Received an Error message %s!", message)
                         break
-                    case _ as type:
+                    case _ as msg_type:
                         # TODO: Handle more WSMsgType.
                         logger.warning(
-                            "Unknown message type %s! message=%s", type, message
+                            "Unknown message type %s! message=%s", msg_type, message
                         )
                         break
         return ws
@@ -66,7 +67,7 @@ class WSMessageRouter:
     async def _initialize_ws(
         self, req: web.Request
     ) -> AsyncGenerator[web.WebSocketResponse]:
-        ws = web.WebSocketResponse(heartbeat=25)  # keep-alive
+        ws = web.WebSocketResponse(heartbeat=WS_HEARTBEAT_INTERVAL)
         logger.info("Connecting to WebSocket at address %s...", req.url)
 
         try:
@@ -150,6 +151,11 @@ class WSMessageRouter:
             logger.exception("Unexpected error while parsing message %s")
             return
 
+        if not isinstance(obj, ChatMessage):
+            ERRORS_TOTAL.labels(type="invalid_message").inc()
+            logger.warning("Received invalid message format: %s", data)
+            return
+
         with track_message_processing():
             await self.redis.publish_message(obj)
 
@@ -185,6 +191,7 @@ class WSMessageRouter:
                 SEND_TIMEOUT,
                 payload,
             )
+            # add_done_callback prevents 'Task was destroyed but pending' warnings
             asyncio.create_task(
                 peer.close(
                     code=WSCloseCode.GOING_AWAY,
@@ -199,6 +206,7 @@ class WSMessageRouter:
                 peer,
                 payload,
             )
+            # add_done_callback prevents 'Task was destroyed but pending' warnings
             asyncio.create_task(
                 peer.close(
                     code=WSCloseCode.INTERNAL_ERROR,

@@ -36,6 +36,7 @@ class TestChatMessage:
         )
         message = json_loads(json_str)
 
+        assert isinstance(message, ChatMessage)
         assert message.text == "From JSON"
         assert message.type == "alert"
         assert message.ts == SAMPLE_TIMESTAMP_3
@@ -80,6 +81,7 @@ class TestChatMessage:
         json_str = json_dumps(message)
         restored = json_loads(json_str)
 
+        assert isinstance(restored, ChatMessage)
         assert restored.text == ""
         assert restored.type == "empty"
         assert restored.ts == 0
@@ -91,5 +93,6 @@ class TestChatMessage:
         json_str = json_dumps(message)
         restored = json_loads(json_str)
 
+        assert isinstance(restored, ChatMessage)
         assert restored.text == unicode_text
         assert restored == message

@@ -30,5 +30,5 @@ def json_dumps(obj: Any) -> str:
     return json.dumps(obj, cls=ChatMessageEncoder)
 
 
-def json_loads(s: str) -> Any:
-    return json.loads(s, object_hook=chat_message_decoder)
+def json_loads(s: str) -> ChatMessage | dict[str, Any]:
+    return json.loads(s, object_hook=chat_message_decoder)  # type: ignore[no-any-return]

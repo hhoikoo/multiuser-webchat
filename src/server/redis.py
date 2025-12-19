@@ -37,7 +37,7 @@ class RedisManager:
     async def connect(self) -> None:
         if self.client:
             # TODO: Change to a warning and just return instead?
-            raise RuntimeError("Attempting to connnect to Redis client twice!")
+            raise RuntimeError("Attempting to connect to Redis client twice!")
 
         with track_redis_operation("connect"):
             self.client = redis.Redis.from_url(  # pyright: ignore[reportUnknownMemberType]
@@ -112,9 +112,9 @@ class RedisManager:
                             count=100,
                             block=5 * MS_IN_SECOND,
                         )
-                except Exception as e:
+                except Exception:
                     ERRORS_TOTAL.labels(type="redis_error").inc()
-                    raise e
+                    raise
 
                 if not stream_data:
                     # Timeout, no new messages in last 5 seconds
@@ -131,8 +131,9 @@ class RedisManager:
             raise exc
         except Exception:
             ERRORS_TOTAL.labels(type="redis_error").inc()
-            logger.exception("Unknown exception occured during listening loop.")
-            return
+            logger.exception("Unknown exception occurred during listening loop.")
+            # Re-raise to fail fast rather than silently stopping message processing
+            raise
 
     def extract_messages_from_response(
         self, response: list[tuple[str, dict[str, Any]]]
@@ -145,7 +146,12 @@ class RedisManager:
 
             try:
                 chat_message = json_loads(payload)
-                yield message_id, chat_message
+                if isinstance(chat_message, ChatMessage):
+                    yield message_id, chat_message
+                else:
+                    logger.warning(
+                        "Message %s has invalid format: %s", message_id, payload
+                    )
             except ValueError:
                 logger.exception(
                     "Failed to parse message with id %s and payload %s!",

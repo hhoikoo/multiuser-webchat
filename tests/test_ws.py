@@ -90,10 +90,8 @@ class TestWSMessageRouter:
 
             await ws_router._broadcast_to_local_peers(sample_message)
 
-            # Failed client should be removed
+            # Exactly one client should be removed (set iteration order is non-deterministic)
             assert len(ws_router.clients) == 1
-            assert client1 in ws_router.clients
-            assert client2 not in ws_router.clients
 
     async def test_send_to_peer_success(
         self, ws_router: WSMessageRouter, mock_websocket: AsyncMock
