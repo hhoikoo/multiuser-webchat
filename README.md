@@ -10,8 +10,9 @@ A real-time multi-user webchat application built with Python (aiohttp), Redis, a
 
 - **Real-time messaging**: Instant message delivery using WebSockets
 - **Multi-user support**: Multiple users can chat simultaneously in a single room
+- **Message persistence**: Messages are stored in Redis Streams with configurable history retrieval
 - **Automatic reconnection**: Client automatically reconnects on connection loss with exponential backoff
-- **Scalable architecture**: Horizontally scalable using Redis pub/sub for inter-process communication
+- **Scalable architecture**: Horizontally scalable using Redis Streams for inter-process communication
 - **Load balancing**: Nginx reverse proxy with support for multiple backend instances
 - **Containerized deployment**: Full Docker Compose setup for easy deployment
 - **Health checks**: Built-in health monitoring for all services
@@ -36,7 +37,7 @@ A real-time multi-user webchat application built with Python (aiohttp), Redis, a
                            │                  ▼
                            │          ┌─────────────┐
                            │          │    Redis    │
-                           │          │  (Pub/Sub)  │
+                           │          │  (Streams)  │
                            │          └─────────────┘
                            │
                            ▼
@@ -50,6 +51,48 @@ A real-time multi-user webchat application built with Python (aiohttp), Redis, a
 │  :3001      │    │  :9091      │    │  /metrics   │
 └─────────────┘    └─────────────┘    └─────────────┘
 ```
+
+## API Endpoints
+
+| Endpoint    | Method    | Description                                     |
+| ----------- | --------- | ----------------------------------------------- |
+| `/`         | GET       | Serves the main chat application (static files) |
+| `/ws`       | WebSocket | WebSocket endpoint for real-time messaging      |
+| `/healthz`  | GET       | Health check endpoint (returns 200 if healthy)  |
+| `/metrics`  | GET       | Prometheus metrics endpoint                     |
+| `/messages` | GET       | Retrieve message history (see below)            |
+
+### Message History
+
+The `/messages` endpoint returns historical messages from Redis Streams:
+
+```bash
+# Get messages from the last 30 minutes (default)
+curl http://localhost:8080/messages
+
+# Get messages from the last 60 minutes
+curl http://localhost:8080/messages?minutes=60
+```
+
+**Query Parameters:**
+
+| Parameter | Default | Range  | Description                              |
+| --------- | ------- | ------ | ---------------------------------------- |
+| `minutes` | 30      | 1-1440 | Number of minutes of history to retrieve |
+
+**Response Format:**
+
+```json
+[
+  {
+    "text": "Hello, world!",
+    "type": "message",
+    "ts": 1703347200000
+  }
+]
+```
+
+Messages are automatically loaded on the frontend when a user first connects, displaying a visual indicator showing how many historical messages were loaded.
 
 ## Prerequisites
 
@@ -159,14 +202,16 @@ For development without Docker:
 
 You can customize the application behavior using environment variables:
 
-| Variable                   | Default                     | Description                                               |
-| -------------------------- | --------------------------- | --------------------------------------------------------- |
-| `HOST`                     | `0.0.0.0`                   | Server bind address                                       |
-| `PORT`                     | `8080`                      | Server port                                               |
-| `WORKERS`                  | `1`                         | Number of worker processes                                |
-| `REDIS_URL`                | `redis://localhost:6379`    | Redis connection URL                                      |
-| `WEB_REPLICAS`             | `4`                         | (Only in `docker-compose`) Number of web service replicas |
-| `PROMETHEUS_MULTIPROC_DIR` | `/tmp/prometheus_multiproc` | Directory for Prometheus multiprocess metrics             |
+| Variable                   | Default                     | Description                                          |
+| -------------------------- | --------------------------- | ---------------------------------------------------- |
+| `HOST`                     | `0.0.0.0`                   | Server bind address                                  |
+| `PORT`                     | `8080`                      | Server port                                          |
+| `WORKERS`                  | `1`                         | Number of worker processes                           |
+| `REDIS_URL`                | `redis://localhost:6379`    | Redis connection URL                                 |
+| `WEB_REPLICAS`             | `4`                         | (Docker Compose only) Number of web service replicas |
+| `PROMETHEUS_MULTIPROC_DIR` | `/tmp/prometheus_multiproc` | Directory for Prometheus multiprocess metrics        |
+
+**Note:** Message history is stored in Redis Streams with a maximum of 10,000 messages (auto-trimmed). Messages older than this limit are automatically removed.
 
 Example:
 
@@ -319,8 +364,14 @@ docker build -t chat-app:latest .
 1. **Scaling**:
 
    - Adjust `WEB_REPLICAS` based on expected load
-   - Monitor Redis memory usage and configure persistence if needed
+   - Monitor Redis memory usage (messages are stored in Redis Streams)
    - Consider Redis Cluster for high availability
+
+1. **Message Persistence**:
+
+   - Messages are stored in Redis Streams (up to 10,000 messages)
+   - Enable Redis persistence (RDB/AOF) to survive Redis restarts
+   - Configure `maxmemory-policy` appropriately for your use case
 
 1. **Monitoring**:
 
